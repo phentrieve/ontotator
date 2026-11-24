@@ -1,5 +1,5 @@
 import { ReanchorPanel, currentReanchorResolution, oldWords, parseReanchorMark, reanchorKey, reanchorMarks, reanchorRef, suggestionsOf, useReanchorContext } from "../variants/ReanchorPanel";
-import { useCarriedReview } from "../editor/carried/useCarriedReview";
+import { recreatedAnnotationId, useCarriedReview } from "../editor/carried/useCarriedReview";
 import { carriedChosenAxisIds, carriedListOrder as orderCarriedFirst, carriedNote, deriveCarriedStates, nextUncheckedKey, rowKeyOf, type CarriedState, type SnapshotLike } from "../editor/carried/checkState";
 import { canRestore, captureDeletedFinding, modifierRestoreCommands, restoreCommands, type DeletedFinding } from "../editor/restoreFinding";
 import { carriedOriginLine, TEXT_CHANGE_ORIGIN, instructionLine, missingReason, roundName, textSpanLine, valuesLines, whatToCheckContext, type WhatToCheckContext } from "../editor/carried/instructions";
@@ -1606,7 +1606,7 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
       : state.missing === "deleted" ? "placeholder:deleted" as const : "placeholder:mapping_failed" as const);
     return instructionLine(carriedContext(state.input).context, state.variant, where);
   };
-  /** The finding re-created via "Mark in text" for a placeholder input, while it exists (client-side link). */
+  /** The finding re-created via "Mark in text" for a placeholder input, while it exists (linked by its ID, issue 652). */
   const recreatedFinding = (state: CarriedState) => {
     const id = state.homeId ? undefined : carried.recreatedFor[state.input.input_id];
     return id ? draft.annotations?.find(snapshot => snapshot.annotation.annotation_id === id) : undefined;
@@ -2078,7 +2078,8 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
     if (activeCarried) {
       const input = activeCarried, source = input.source_snapshot.annotation;
       handleDeselectAll();
-      setPendingAnnotation({ annotationId: `ann-${crypto.randomUUID()}`, evidenceId: newEvidenceId(), layerId: source.layer_id,
+      // The ID names the input: the link to it is saved with the finding and survives a reload (issue 652).
+      setPendingAnnotation({ annotationId: recreatedAnnotationId(input.input_id), evidenceId: newEvidenceId(), layerId: source.layer_id,
         typeId: source.type_id, segments: payload.segments, carriedInput: input });
       return;
     }
@@ -2260,9 +2261,8 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
       const completed = pending.reanchorItem && !valuesToCheck(pending.reanchorItem) ? pending.reanchorItem : null;
       if (completed) await resolveReanchor(completed, "recreated", pending.annotationId);
       else if (pending.reanchorItem) setResolutionItem(pending.reanchorItem);
-      // Linked client-side as the input's result; the input stays "Check needed" (no auto-complete).
+      // Linked as the input's result by its ID; the input stays "Check needed" (no auto-complete).
       if (pending.carriedInput) {
-        carried.rememberRecreated(pending.carriedInput.input_id, pending.annotationId);
         setFocusRequest({ key: `annotation:${pending.annotationId}`, find: carriedPrimary });
       }
       setPendingAnnotation(null);
@@ -4283,7 +4283,9 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
             ? <h1 className="case-title" title={view.document.document_id}><LanguageText text={taskText(assignmentNavigation.current)} code={assignmentNavigation.current.language} /></h1>
             : <><h1 className="case-title" title={view.document.document_id}>{view.document.document_id}</h1><LanguageTag code={view.document.language} /></>}
           {(() => {
-            const modeText = roundKind === "consolidation" ? modeBadge("review").label : roundKind === "text_change" && roundInputs.length > 0 ? TEXT_CHANGE_ORIGIN : isCarryKind(roundKind) ? roundBadge ?? "Review carried findings" : badge.label;
+            // Issue 652: "Check after text change" only while something still needs a check; then the round's name.
+            const textChangeOpen = roundKind === "text_change" && (carried.states.some(state => state.unchecked) || unresolvedReanchorCount > 0);
+            const modeText = roundKind === "consolidation" ? modeBadge("review").label : textChangeOpen ? TEXT_CHANGE_ORIGIN : isCarryKind(roundKind) ? roundBadge ?? "Review carried findings" : badge.label;
             // Issue 596: in the merged bar a long mode takes two lines rather than an ellipsis; --mode-half is about
             // half its length, the least width at which two lines hold it (editor.css).
             return <span title={roundTitle ?? (roundKind !== "consolidation" && !isCarryKind(roundKind) ? badge.title : undefined)}
@@ -4434,7 +4436,7 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
           {/* Narrow layout: attach mode opens on Findings, where the text pane's banner and its Cancel are out of sight. */}
           {panesLayout && attachActive && attachModifier && mobilePane === "list" && <div role="status" className="attach-mention-banner attach-mention-banner--list">
             <span>{attachCopy.banner(attachModifier.termLabel, touchOnly)}</span>
-            <Button size="sm" aria-keyshortcuts="Escape" onClick={cancelAttachModifier}>Cancel (Esc)</Button>
+            <Button size="sm" aria-keyshortcuts={touchOnly ? undefined : "Escape"} onClick={cancelAttachModifier}>{touchOnly ? "Cancel" : "Cancel (Esc)"}</Button>
           </div>}
           {/* Multi-layer controls (rendered only if >1 layer) */}
           <LayerControls

@@ -5,7 +5,7 @@ import { useTermLabels } from '../editor/useTermLabels';
 import { Button, Textarea, StatusBadge } from '../ui';
 import { ReasonButton } from '../ui/Help';
 import { DiffView } from '../translation/DiffView';
-import type { TextDiffPart } from '../translation/textDiff';
+import { diffText, type TextDiffPart } from '../translation/textDiff';
 import { toUtf16 } from '../spans/offsets';
 import type { CodepointSegment } from '../spans/adapter';
 
@@ -42,6 +42,70 @@ export function pendingDiffParts(item: ReanchorItem): TextDiffPart[] | null {
   return oldPosition === old.end && newPosition === next.end
     && parts.filter(part => part.op !== 'insert').map(part => part.text).join('') === old.text
     && parts.filter(part => part.op !== 'delete').map(part => part.text).join('') === next.text ? parts : null;
+}
+
+type Span = { start: number; end: number };
+/** The stretch from the first to the last window, when every window lies inside `context`. */
+const stretchIn = (context: Window, windows: readonly Window[]): Span | null => {
+  if (!windows.length || !windows.every(validWindow)) return null;
+  const start = Math.min(...windows.map(window => window.start)), end = Math.max(...windows.map(window => window.end));
+  return start >= context.start && end <= context.end && end > start ? { start, end } : null;
+};
+
+/**
+ * Where "Show text change" anchors the two contexts (issue 652): the old words of the single mention, and in the
+ * current context the place in use (else place 1), or else the new wording in their place. Null when there is none
+ * inside the windows: the contexts are then compared as a whole.
+ */
+export function contextAnchor(item: ReanchorItem, place = 0): { old: Span; current: Span; moved: boolean } | null {
+  if (item.old_mentions.length !== 1 || !validWindow(item.old_context) || !validWindow(item.new_context)) return null;
+  const old = stretchIn(item.old_context, item.old_mentions[0].segments);
+  if (!old) return null;
+  const places = suggestionsOf(item);
+  for (const index of [...new Set([place, 0])]) {
+    const current = places[index] ? stretchIn(item.new_context, places[index]) : null;
+    if (current) return { old, current, moved: true };
+  }
+  const changed = item.changed_at && !places.length ? stretchIn(item.new_context, [item.changed_at]) : null;
+  return changed ? { old, current: changed, moved: false } : null;
+}
+
+const slice = (points: readonly string[], start: number, end: number) => points.slice(start, end).join('');
+
+/**
+ * The word diff of the two contexts, anchored as `contextAnchor` says: the words before the old words are compared
+ * with those before the place, the words after with those after, so a reordered sentence does not pair unrelated
+ * words. The parts give the old context (without inserts) and the current one (without deletions) exactly.
+ */
+export function anchoredDiffParts(item: ReanchorItem, place = 0): TextDiffPart[] | null {
+  const anchor = contextAnchor(item, place);
+  if (!anchor) return null;
+  const old = Array.from(item.old_context.text), next = Array.from(item.new_context.text);
+  const o = { start: anchor.old.start - item.old_context.start, end: anchor.old.end - item.old_context.start };
+  const n = { start: anchor.current.start - item.new_context.start, end: anchor.current.end - item.new_context.start };
+  const was = slice(old, o.start, o.end), now = slice(next, n.start, n.end);
+  const parts = [
+    ...diffText(slice(old, 0, o.start), slice(next, 0, n.start)),
+    ...(was === now ? [{ op: 'equal' as const, text: now }] : diffText(was, now)),
+    ...diffText(slice(old, o.end, old.length), slice(next, n.end, next.length)),
+  ];
+  const merged: TextDiffPart[] = [];
+  for (const part of parts) {
+    if (!part.text) continue;
+    const previous = merged.at(-1);
+    if (previous?.op === part.op) previous.text += part.text; else merged.push({ ...part });
+  }
+  return merged;
+}
+
+/** The current context with the anchor (the place in use, or the new wording) marked. */
+function currentContext(item: ReanchorItem, place: number): ReactNode {
+  if (!validWindow(item.new_context)) return 'New context is unavailable.';
+  const anchor = contextAnchor(item, place);
+  if (!anchor) return item.new_context.text;
+  const points = Array.from(item.new_context.text);
+  const start = anchor.current.start - item.new_context.start, end = anchor.current.end - item.new_context.start;
+  return <>{slice(points, 0, start)}<mark data-current-kind={anchor.moved ? 'place' : 'changed'}>{slice(points, start, end)}</mark>{slice(points, end, points.length)}</>;
 }
 
 function oldContext(item: ReanchorItem): ReactNode {
@@ -138,8 +202,10 @@ function ResolutionActions({item,resolution,busy,onRecreate,onDismiss,onResolved
     <div className="reanchor-row__actions">
       {offered && <ReasonButton reason={unavailable ?? null} variant="primary" size="sm" data-reanchor-primary="" disabled={busy || saving}
         onClick={()=>{if(!unavailable)onUseLocation(item,Math.min(place,places.length-1));}}>Use this location</ReasonButton>}
-      {offered && places.length>1 && onSelect && <Button variant="quiet" size="sm" disabled={busy || saving}
-        onClick={()=>onSelect(item,(place+1)%places.length)}>Next place ({Math.min(place,places.length-1)+1} of {places.length})</Button>}
+      {/* Issue 652: short, so that it fits beside "Use this location" in the 1280 px column; the name says what it does. */}
+      {offered && places.length>1 && onSelect && <Button variant="quiet" size="sm" className="reanchor-row__next" disabled={busy || saving}
+        aria-label={`Next place (${Math.min(place,places.length-1)+1} of ${places.length})`} title="Next place"
+        onClick={()=>onSelect(item,(place+1)%places.length)}>{Math.min(place,places.length-1)+1} of {places.length}<span aria-hidden="true"> ›</span></Button>}
       {onRecreate && <ReasonButton reason={unavailable ?? null} variant={offered ? 'secondary' : 'primary'} size="sm" data-reanchor-primary={offered ? undefined : ''}
         disabled={busy || saving} onClick={()=>{if(!unavailable)onRecreate(item);}}>Mark in text</ReasonButton>}
       {onDismiss && <Button ref={trigger} size="sm" aria-expanded={editing} disabled={busy || saving} onClick={()=>setEditing(true)}>Dismiss…</Button>}
@@ -168,7 +234,7 @@ export function ReanchorPanel({ items, labelFor, onContext, resolutions=[], anno
       const resolution=currentReanchorResolution(item,resolutions,annotations);
       const places=suggestionsOf(item), changed=item.changed_at && validWindow(item.changed_at) ? item.changed_at : null;
       const selected=!resolution && selectedKey===reanchorKey(item), values=valuesOf?.(item);
-      const words=oldWords(item);
+      const words=oldWords(item), place=placeOf?.(item) ?? 0;
       return <li key={reanchorKey(item)} className="reanchor-row" data-reanchor-item={reanchorKey(item)} data-reanchor-pending={!resolution}
         data-selected={selected || undefined} aria-current={selected || undefined}>
         <p className="reanchor-row__head">
@@ -180,7 +246,7 @@ export function ReanchorPanel({ items, labelFor, onContext, resolutions=[], anno
         </p>
         {values && <p className="reanchor-row__values" aria-label="Values">{values}</p>}
         <ResolutionActions item={item} resolution={resolution} busy={busy} onRecreate={onRecreate} onDismiss={onDismiss} recreateUnavailableReason={recreateUnavailableReason}
-          onUseLocation={onUseLocation} onSelect={onSelect} place={placeOf?.(item) ?? 0} onResolved={()=>{
+          onUseLocation={onUseLocation} onSelect={onSelect} place={place} onResolved={()=>{
           if (onResolved) { onResolved(item); return; }
           const rows=[...(root.current?.querySelectorAll<HTMLElement>('[data-reanchor-item]') ?? [])];
           const next=rows.slice(index+1).concat(rows.slice(0,index)).find(row=>row.dataset.reanchorPending==='true');
@@ -197,8 +263,8 @@ export function ReanchorPanel({ items, labelFor, onContext, resolutions=[], anno
             {axisIndex>0 && ', '}<span>{axis}: {value ?? 'Not specified'}{item.axes_defaulted?.includes(axis) ? ' (defaulted)' : ''}</span>
           </span>)}</p>}
           <p>Original context</p><div className="reanchor-context" data-old-context data-context-start={item.old_context.start}>{oldContext(item)}</div>
-          <p>Current context</p><div className="reanchor-context" data-current-context>{validWindow(item.new_context) ? item.new_context.text : 'New context is unavailable.'}</div>
-          {parts ? <div data-old-start={item.old_context.start} data-new-start={item.new_context.start}><DiffView before={item.old_context.text} after={item.new_context.text} /></div> : <p>Text changes are unavailable.</p>}
+          <p>Current context</p><div className="reanchor-context" data-current-context>{currentContext(item, place)}</div>
+          {parts ? <div data-old-start={item.old_context.start} data-new-start={item.new_context.start}><DiffView before={item.old_context.text} after={item.new_context.text} parts={anchoredDiffParts(item, place) ?? undefined} /></div> : <p>Text changes are unavailable.</p>}
         </details>
       </li>;
   };

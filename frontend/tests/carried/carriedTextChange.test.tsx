@@ -50,6 +50,17 @@ describe("carried findings after a text change", () => {
     expect(screen.getByText("0 of 1 checked")).toBeDefined();
   });
 
+  it("names the round instead once every input is checked (issue 652)", () => {
+    const carried = finding("carried");
+    const view = workspaceFixture().view;
+    view.key.round_id = "round-2"; view.draft.key = view.key; view.require_spanless_note = false;
+    view.draft.annotations = [carried];
+    view.draft.round_input_resolutions = [{ input_id: "input-1", outcome: "completed", annotation_ref: { annotation_id: "carried", version: carried.version } }];
+    render(<CaseScreen view={view} workspaceId="round-workspace" roundKind="text_change" roundInputs={[draftInput("input-1", carried)]} onClose={vi.fn()} />);
+    expect(screen.queryByText("Check after text change", { selector: ".case-mode" })).toBeNull();
+    expect(screen.getByText("Review carried findings", { selector: ".case-mode" })).toBeDefined();
+  });
+
   it("handover rounds show their carried inputs like a carry-forward", () => {
     const carried = finding("carried");
     const input = { ...draftInput("input-1", carried), source_draft_snapshot_id: null, source_submission_id: "sub-1", source_round_ordinal: 1 };

@@ -10,6 +10,7 @@ import {
 import { paragraphStarts } from "../variants/paragraphs";
 import type { ChangePassage, TextChanges } from "../translation/textDiff";
 import { Button } from "../ui/Button";
+import { useTouchOnly } from "../ui/useMediaQuery";
 import "./textChanges.css";
 
 export interface TextPaneProps {
@@ -184,6 +185,7 @@ export const TextPane: React.FC<TextPaneProps> = ({
   framedIds,
   onHoverMentions,
 }) => {
+  const touchOnly = useTouchOnly();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const handleRef = useRef<SpanEditorHandle | null>(null);
   const attachTextElement = useCallback((element: HTMLDivElement | null) => {
@@ -448,8 +450,9 @@ export const TextPane: React.FC<TextPaneProps> = ({
             {attachMessage ?? intentMessage ?? <><strong>Adding a mention:</strong> select text to attach it to the selected finding.</>}
           </span>
           {onCancelAttach && (
+            // Issue 652: on a touch screen the button names no key, as the banner does (#644).
             <Button size="sm" onClick={onCancelAttach}>
-              Cancel (Esc)
+              {touchOnly ? "Cancel" : "Cancel (Esc)"}
             </Button>
           )}
         </div>
