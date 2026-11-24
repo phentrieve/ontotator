@@ -147,6 +147,8 @@ describe("narrow table states (issue 248)", () => {
   const states: Record<string, string | null> = {
     "assigned, not started": "not started",
     "after translation review": "after review",
+    "blocked, translation rejected": "blocked",
+    "blocked, queried (Ana Weber waiting)": "blocked",
     "waiting for review (Ana Weber, Tom Reis)": "after review",
     "in review": null,
     "in review, 1 of 2 started": "in review",

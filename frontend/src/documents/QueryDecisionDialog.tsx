@@ -5,11 +5,11 @@
  * - `unchanged`, "Accept v1 as it is…": the version is accepted unchanged; the answer is required.
  * Both are recorded as the lead's decision on the query, and the reviewer reads the answer at the submitted task.
  */
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, type DocumentRowView, type QueryDecisionPreview, type QueryDecisionResult } from "../api/client";
 import { textLabel } from "../app/identity";
 import { ErrorNotice } from "../admin/ErrorNotice";
-import { DiffView } from "../translation/DiffView";
+import { DiffView, scrollToFirstChange } from "../translation/DiffView";
 import { TranslationEditor } from "../translation/TranslationEditor";
 import { diffTextBounded } from "../translation/textDiff";
 import { Button, Dialog, InlineMessage, Textarea } from "../ui";
@@ -26,7 +26,7 @@ export function queryRefusal(reason: string | null | undefined, short: string): 
     case "review_open": return "A translation review of this version is open. Withdraw it with Remove… in the reviewer’s row of the Translation part before you decide the query.";
     case "not_newest": return "A newer version of this translation exists. Reload the row to see it.";
     case "discarded": return "This translation was discarded. Reload the row to see its current state.";
-    case "unchanged": return `This text is the same as ${short}. To accept ${short} without changes, use Accept ${short} as it is….`;
+    case "unchanged": return `This text is the same as ${short}. To accept ${short} without changes, use Accept ${short} as it is…`;
     case "answer_required": return "Enter the answer to the reviewer.";
     default: return null;
   }
@@ -123,6 +123,14 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
   const greyed = state === null ? "Loading the query…" : !invalid ? null
     : taking ? "Change the text, or accept the version as it is." : "Enter the answer to the reviewer.";
   const describedBy = greyed === null || busy ? undefined : tried && !taking && state !== null ? `${id}-answer-error` : `${id}-missing`;
+  // Issue 613: "Changes to v1" opens at its first change once the text is there, not at the start of the text.
+  const changesView = useRef<HTMLDivElement>(null), scrolled = useRef(false);
+  const hasChanges = parts !== null;
+  useLayoutEffect(() => {
+    if (!hasChanges || scrolled.current || !changesView.current) return;
+    scrolled.current = true;
+    scrollToFirstChange(changesView.current);
+  }, [hasChanges]);
   // Rule 6: focus on the primary action when the dialog opens.
   const primary = useRef<HTMLButtonElement>(null);
 
@@ -151,16 +159,17 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
           {taking
             ? <>
               <p>{`The text below becomes ${next}, a correction of ${short}, and is accepted. It is recorded as your decision on the query.`}</p>
+              {/* Issue 613: the changes first, opened at the first one (as Show the proposed text, #591), then the text to edit. */}
+              {parts !== null && <div className="editorial-correction-changes">
+                <p className="upload-version-changes"><strong>{`Changes to ${short}`}</strong>{count !== null && ` · ${count} ${count === 1 ? "passage" : "passages"} changed`}</p>
+                <DiffView ref={changesView} before={original} after={value} parts={parts} lang={row.language} />
+              </div>}
               <div className="form-group">
                 <label id={`${id}-text-label`} htmlFor={`${id}-text`} className="form-label">Reviewer’s text</label>
                 <TranslationEditor id={`${id}-text`} labelledBy={`${id}-text-label`} describedBy={`${id}-text-hint`} machineText={original} value={value}
                   lang={row.language} disabled={busy} onChange={event => { setText(event.target.value); setError(undefined); }} />
                 <p id={`${id}-text-hint`} className="field-hint">{edited ? "You changed the reviewer’s text. The record says so." : "You can still change the text here."}</p>
               </div>
-              {parts !== null && <div className="editorial-correction-changes">
-                <p className="upload-version-changes"><strong>{`Changes to ${short}`}</strong>{count !== null && ` · ${count} ${count === 1 ? "passage" : "passages"} changed`}</p>
-                <DiffView before={original} after={value} parts={parts} lang={row.language} />
-              </div>}
               {changed && parts === null && <p className="field-hint">The texts differ too much to mark the changes.</p>}
               {!changed && <InlineMessage tone="warning">{queryRefusal("unchanged", short)}</InlineMessage>}
               {consequences.length > 0 && <InlineMessage tone="warning" title={annotated ? `Annotation has work on ${short}.` : `${short} has work.`}>

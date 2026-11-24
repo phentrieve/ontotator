@@ -18,7 +18,13 @@ type Change = TextPauseActionView["changes"][number];
 type Task = Change["tasks"][number];
 
 export const PAUSE_ACTION_LABELS: Readonly<Record<PauseAction, string>> = { pause: "Pause texts…", release: "Release texts…" };
-export const PAUSE_TITLES: Readonly<Record<PauseAction, string>> = { pause: "Pause texts", release: "Release texts" };
+/** Issue 613: the menu entry for one selected text reads in the singular, as the other entries do (#588). */
+export function pauseActionLabel(action: PauseAction, count: number): string {
+  return count === 1 ? (action === "pause" ? "Pause text…" : "Release text…") : PAUSE_ACTION_LABELS[action];
+}
+export function pauseTitle(action: PauseAction, count: number): string {
+  return pauseActionLabel(action, count).replace(/…$/, "");
+}
 
 const textsOf = (items: readonly { case_id: string; language: string }[]): string[] => [...new Set(items.map(item => textLabel(item)))];
 const tasksOf = (changes: readonly Change[]): Task[] => changes.flatMap(item => item.tasks);
@@ -95,7 +101,7 @@ export function pauseConsequences(preview: TextPauseActionView): string[] {
       : "Nobody has an open task on these texts now.",
     `Tasks assigned, reopened or given a new round on ${preview.changes.length === 1 ? "this text" : "these texts"} later are paused from the start, until you release the ${preview.changes.length === 1 ? "text" : "texts"}.`,
     "Submitted work and final results are untouched and are exported as before.",
-    "A pause from a problem report is separate: it stays, and deciding a report does not release this pause. Release texts… ends it.",
+    `A pause from a problem report is separate: it stays, and deciding a report does not release this pause. ${pauseActionLabel("release", preview.changes.length)} ends it.`,
   ];
   const still = tasks.filter(task => task.paused_by_report).length;
   return [
@@ -103,7 +109,7 @@ export function pauseConsequences(preview: TextPauseActionView): string[] {
       : tasks.length > still ? `${plural(tasks.length - still, "task")} of ${who} can be worked on again, as they were left.`
       : `The lead pause of ${texts} ends.`,
     ...(still ? [`${plural(still, "task")} ${still === 1 ? "stays" : "stay"} paused by a problem report until that report is decided.`] : []),
-    "Pause texts… pauses them again.",
+    preview.changes.length === 1 ? "Pause text… pauses it again." : "Pause texts… pauses them again.",
   ];
 }
 

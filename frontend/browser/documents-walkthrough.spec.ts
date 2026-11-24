@@ -181,7 +181,7 @@ test("step 6: the lead requests a correction, Ana corrects → v2", async () => 
   await expect(reviewer.locator("option", { hasText: ANA })).toHaveCount(1);
   if ((await reviewer.inputValue()) === "") await chooseOption(reviewer, ANA);
   await form.getByLabel("Reason for another review", { exact: true }).fill("Dosis prüfen");
-  await clicks.count(form.getByRole("button", { name: "Ask the reviewer", exact: true }));
+  await clicks.count(correction.getByRole("button", { name: "Ask the reviewer", exact: true }));
   await expect(form.getByText(/was asked to correct the translation\.$/)).toBeVisible();
   await correction.getByRole("button", { name: "Close", exact: true }).first().click();
 

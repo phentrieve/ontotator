@@ -4,7 +4,7 @@ import { ErrorNotice } from "../admin/ErrorNotice";
 import { plural } from "../app/labels";
 import { Button, Checkbox, Dialog, InlineMessage, Textarea } from "../ui";
 import { GroupLine } from "./BulkTaskDialog";
-import { pauseApplyLabel, pauseConsequences, pauseGroups, pauseSummaryText, PAUSE_TITLES, type PauseAction } from "./bulkPauseModel";
+import { pauseApplyLabel, pauseConsequences, pauseGroups, pauseSummaryText, pauseTitle, type PauseAction } from "./bulkPauseModel";
 
 export interface BulkPauseDialogProps {
   projectKey: string;
@@ -89,7 +89,7 @@ export function BulkPauseDialog({ projectKey, action, rows, onClose, onApplied }
       onClick={primary}>{pauseApplyLabel(action, preview ? count : null)}</Button>
   </>;
 
-  return <Dialog open title={`${PAUSE_TITLES[action]}: ${plural(rows.length, "text")}`} size="md" onClose={saving ? undefined : onClose} footer={footer}>
+  return <Dialog open title={`${pauseTitle(action, rows.length)}: ${plural(rows.length, "text")}`} size="md" onClose={saving ? undefined : onClose} footer={footer}>
     <div className="bulk-dialog">
       {notice && <InlineMessage tone="info">{notice}</InlineMessage>}
       {!confirming && <p className="field-hint">{pausing

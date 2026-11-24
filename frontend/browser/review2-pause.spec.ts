@@ -62,8 +62,8 @@ async function openCard(page: Page, caseId: string): Promise<Locator> {
 async function pauseText(page: Page, caseId: string): Promise<void> {
   await rowBox(page, caseId, "en").check();
   await selectionBar(page).getByRole("button", { name: "More actions" }).click();
-  await page.getByRole("menu", { name: "More actions" }).getByRole("menuitem", { name: "Pause texts…" }).click();
-  const dialog = page.getByRole("dialog", { name: "Pause texts: 1 text" });
+  await page.getByRole("menu", { name: "More actions" }).getByRole("menuitem", { name: "Pause text…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Pause text: 1 text" });
   const apply = dialog.getByRole("button", { name: "Pause 1 text" });
   await dialog.getByLabel(/^Reason/).fill(WHY);
   await apply.click();
@@ -137,7 +137,7 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     // F7 a: "Release…" in the card says that it worked, as the bulk action does.
     await card.getByRole("button", { name: "Back", exact: true }).click();
     await card.getByRole("button", { name: "Release…, EN100028 en" }).click();
-    const release = page.getByRole("dialog", { name: "Release texts: 1 text" });
+    const release = page.getByRole("dialog", { name: "Release text: 1 text" });
     const apply = release.getByRole("button", { name: "Release 1 text" });
     await apply.click();
     await release.getByLabel(/^I understand/).check();

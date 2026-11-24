@@ -17,6 +17,7 @@ const open = () => within(panel()).getByRole("button", { name: "Open translation
 beforeEach(() => {
   vi.spyOn(api, "getVariantMetadata").mockResolvedValue({ document_id: "case-0101-de", text_sha256: "sha-v2" } as VariantSummary);
   vi.spyOn(api, "startLeadCorrection");
+  vi.spyOn(api, "getProfile").mockResolvedValue({ qualification: "physician" } as Awaited<ReturnType<typeof api.getProfile>>);
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -76,6 +77,18 @@ it("shows the qualification message with a profile link", async () => {
   fireEvent.click(link);
   expect(props.onNavigate).toHaveBeenCalledWith({ name: "me", documents: "p" });
   expect(within(panel()).queryByRole("checkbox")).toBeNull();
+});
+
+it("says up front that the profile has no qualification and keeps Open unavailable (issue 613)", async () => {
+  vi.mocked(api.getProfile).mockResolvedValue({ qualification: "  " } as Awaited<ReturnType<typeof api.getProfile>>);
+  const props = renderPanel();
+  await within(panel()).findByText("A translation review records your qualification. Your profile has none yet.");
+  expect(open().getAttribute("aria-disabled")).toBe("true");
+  expect(document.getElementById(open().getAttribute("aria-describedby")!)?.textContent).toBe("A translation review records your qualification. Your profile has none yet.");
+  fireEvent.click(open());
+  expect(api.startLeadCorrection).not.toHaveBeenCalled();
+  fireEvent.click(within(panel()).getByRole("link", { name: "Add your qualification in your profile" }));
+  expect(props.onNavigate).toHaveBeenCalledWith({ name: "me", documents: "p" });
 });
 
 it("shows LEAD_CORRECTION_NOT_AVAILABLE reasons in words", async () => {
