@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ontotator-mcp"
-version = "0.15.0"
+version = "0.15.1"
 description = "MCP server for an Ontotator instance: project setup, status and exports over an API token"
 readme = "README.md"
 license = "MIT"

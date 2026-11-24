@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-11-24
+
 ### Fixed
 
 - Editor, **Needs review after the text change** (#649): when the old words occur twice, **Use this location** first offers the place the finding moved to, not the other occurrence that stayed where it was. After *Die Physiotherapie wurde begonnen, nachdem eine Areflexie bemerkt wurde. Die Areflexie besserte sich…* became *Als eine Areflexie auffiel, wurde die Physiotherapie begonnen. …*, place 1 of 2 was the second *Areflexie*, and one click re-created the finding there. The current context now opens at the moved words too. No API change, no migration.
@@ -613,7 +615,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 First public release.
 
-[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/phentrieve/ontotator/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/phentrieve/ontotator/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/phentrieve/ontotator/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/phentrieve/ontotator/compare/v0.13.0...v0.14.0
