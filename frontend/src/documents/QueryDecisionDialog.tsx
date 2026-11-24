@@ -159,7 +159,7 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
           {taking
             ? <>
               <p>{`The text below becomes ${next}, a correction of ${short}, and is accepted. It is recorded as your decision on the query.`}</p>
-              {/* Issue 613: the changes first, opened at the first one (as Show the proposed text, #591), then the text to edit. */}
+              {/* Issue 613: the changes first, opened at the first one (as Show the proposed text, issue 591), then the text to edit. */}
               {parts !== null && <div className="editorial-correction-changes">
                 <p className="upload-version-changes"><strong>{`Changes to ${short}`}</strong>{count !== null && ` · ${count} ${count === 1 ? "passage" : "passages"} changed`}</p>
                 <DiffView ref={changesView} before={original} after={value} parts={parts} lang={row.language} />
