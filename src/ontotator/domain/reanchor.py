@@ -295,6 +295,19 @@ def _needs_review(
     )
 
 
+def carry_window(window: TextWindow, m: TextMap, new: str) -> TextWindow:
+    """``window`` of the old text of ``m`` as the window of ``new`` it maps to.
+
+    The edges map as those of a needs-review item's new context do and are
+    widened to whole words. A pending item carried on to a further version
+    (#650) gets its new context this way.
+    """
+    left = _boundary(m, window.start, end=False, new_length=len(new))
+    right = max(left, _boundary(m, window.end, end=True, new_length=len(new)))
+    left, right = _whole_word_window(new, left, right)
+    return TextWindow(left, right, new[left:right])
+
+
 def window_diff(
     old_window: TextWindow, new_window: TextWindow
 ) -> tuple[WindowOpcode, ...]:
@@ -382,6 +395,8 @@ def _tokens(text: str, offset: int) -> list[tuple[int, int, str]]:
 
 
 _TOKEN = re.compile(r"\w+|[^\w\s]")
+# Unchanged words that must frame a new wording, on both sides together.
+_MIN_FRAME_WORDS = 2
 
 
 def _changed_at(
@@ -411,6 +426,18 @@ def _changed_at(
         last < len(ops) - 1 and ops[last + 1][0] == "equal"
     )
     if not (framed_left and framed_right):
+        return None
+    # Issue 652: a lone shared word ("eine") is no frame. Deleted words next to
+    # a reordered clause would otherwise read as replaced by that clause.
+    left_op = ops[first] if ops[first][0] == "equal" else ops[first - 1]
+    right_op = ops[last] if ops[last][0] == "equal" else ops[last + 1]
+    frame = sum(
+        1
+        for _, i, i_end, _, _ in {left_op, right_op}
+        for _, _, word in old_tokens[i:i_end]
+        if word[0].isalnum() or word[0] == "_"
+    )
+    if frame < _MIN_FRAME_WORDS:
         return None
     covered = [
         index for index, (a, b, _) in enumerate(old_tokens) if a < end and start < b

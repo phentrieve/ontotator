@@ -99,6 +99,8 @@ A task starts with the person's first saved change; opening it is not enough, an
 
 A text with fewer annotators than **Annotators per text** shows what its people are doing, not the free place. While someone has an open task, **Annotation** reads for example *assigned, not started · max 2* or *1 of 2 submitted · max 3* (short of room *0/1 · max 2*, *1/2 · max 3*: submitted of the people who hold the text, then the limit; the tooltip has the full state), counted out of the people who hold the text; **Waiting on** names the person, the text is under **In progress**, and **Next step** still offers **Assign annotation…** for another annotator. The same holds after **Start a round…** for a text with one annotator. Only a text nobody is working on reads *1 annotator · max 2* or *Unassigned* and is listed under **To assign** (or under **Needs your decision** once its one annotation is submitted). To give texts in progress another annotator, select them and click **Assign annotation…** in the selection bar: it assigns only where a text still has a free place. To list these texts, tick **Can take another annotator** under **Annotation** in **Filter**: it lists every text whose steps include **Assign annotation…**, also while its first annotator is at work. Combine it with the tab **In progress** to see only the texts that someone already works on. When **To assign** is empty, it says so (*No text waits for an assignment*) and offers **Show texts that can take another annotator**.
 
+Where annotation cannot start because of the translation, **Annotation** says why, alike in the table, the text card and the narrow cards: *blocked, translation rejected* (or *queried*, *not accepted*; short of room just *blocked*, the tooltip has the rest). A translation that is only waiting for its review reads *after translation review*.
+
 The counts in **Annotation**, for example *0 of 1 submitted*, count only work on the newest version of the text. After a text change, a submission on the old version no longer counts: neither when it was carried to the new version, nor when the new version was started fresh. Carried work counts once it is submitted on the new version.
 
 ### Use the Documents tabs
@@ -275,8 +277,8 @@ What for: have a translation corrected by a reviewer.
 
 1. Open the text card and click **Translation**.
 2. At the version, click **Ask a reviewer to correct…**. It is offered only at an accepted version; for a rejected or queried one, use **Resolve…** ([Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation)).
-3. Choose the **Translation reviewer** and enter the **Reason for another review**. The reviewer reads it under the task in **My tasks** and above **Decision** in the review (*Second review requested by the lead on …*), so say what to look at.
-4. Click **Ask the reviewer**, then **Close**. Before that, **Cancel** closes the dialog without asking anyone.
+3. Choose the **Translation reviewer** (the dialog opens there) and enter the **Reason for another review**. People who read both languages of the text come first; for the others the list says what is missing, for example *Cy Annotator (ann-0004), does not read en*, and choosing one asks you to tick *Assign despite missing en in this reviewer's profile*. The reviewer reads it under the task in **My tasks** and above **Decision** in the review (*Second review requested by the lead on …*), so say what to look at.
+4. Click **Ask the reviewer**, then **Close**. Until a reviewer and a reason are given, the button says what is missing next to it, for example *Choose a reviewer and enter a reason.* Before that, **Cancel** closes the dialog without asking anyone.
 
 If the reviewer submits **Accepted with corrections**, the corrected text becomes a new text version. While a lead is correcting the same version themselves, the request is refused with *A lead is correcting this version.* ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
@@ -396,7 +398,7 @@ With **Annotate only after the translation review is accepted** on, you can assi
 What happens to a waiting task:
 
 - **Rejected** or **Query**: it keeps waiting. Decide on the text as usual.
-- **Accepted with corrections**, a lead correction or an uploaded correction: the task moves to the new version and opens there once that version is accepted. A task from proposals waits on the old version: the annotator sees **Waiting for the project lead**, and once the new version is accepted the text shows **Handle text change…**. There you move the task to the new version, where the decisions on the proposals are carried and only changed passages need a check. If the new version has no proposals yet, moving is not available: wait for them (their automatic transfer may still be running) or import them, click **Retry**, then move the task. A paused task stays too, until you decide its report.
+- **Accepted with corrections**, a lead correction or an uploaded correction: the task moves to the new version and opens there once that version is accepted. A task from proposals waits on the old version: the annotator sees **Waiting for the project lead**, and once the new version is accepted the text shows **Handle text change…**. There you move the task to the new version, where the decisions on the proposals are carried and only changed passages need a check. If the new version has no proposals yet (proposals that wait there for a check because the correction changed their words count), moving is not available: wait for them (their automatic transfer may still be running) or import them, click **Retry**, then move the task. A paused task stays too, until you decide its report.
 - **Fix typos…**: tasks nobody opened move to the new version at once. A task from proposals that nobody opened moves too, a few seconds later, when no tool proposal waits for a check after the fix; otherwise it stays, and the dialog names it with the reason ([Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review)).
 - A task on an uploaded correction that was then **Rejected** or **Query**, with the older version accepted afterwards: the text shows **Handle text change…**; **Withdraw** the task, then assign the accepted version.
 - You remove the review: the task keeps waiting, and the text shows the next step for the review.
@@ -491,7 +493,7 @@ What a pause does:
 
 To pause:
 
-1. Select the texts, then click **More actions** in the selection bar and choose **Pause texts…**. When every selected text is already paused, the entry is unavailable and says so.
+1. Select the texts, then click **More actions** in the selection bar and choose **Pause texts…** (**Pause text…** with one text selected; likewise **Release text…**). When every selected text is already paused, the entry is unavailable and says so.
 2. Read the preview. It groups the texts by what happens, for example *Pause 2 texts with 3 open tasks · Tom Reis 2, R. Roe 1* and *Pause 2 texts without open tasks · tasks assigned later are paused from the start*; click **Show all** to list every text. Texts that are already paused have their own group, *Skip 1 text · already paused by a lead*.
 3. Enter the **Reason**. It is required: the people see it in **My tasks** and in the task.
 4. Click the button that names the work, for example *Pause 4 texts*. The dialog says what happens. Tick **I understand — pause the work on these texts** and click the button again.

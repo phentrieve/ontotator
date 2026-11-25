@@ -70,6 +70,7 @@ from ontotator.storage.database import Database
 from ontotator.storage.live_submissions import discarded_ids, live_submission
 from ontotator.storage.overview_tables import DraftSnapshotRow
 from ontotator.storage.proposal_queries import (
+    has_review_items,
     newest_proposal_refs,
     newest_proposal_set,
 )
@@ -196,6 +197,26 @@ def target_proposals(
     ]
 
 
+def carry_targets(
+    repo: Repository,
+    conn: Connection,
+    project: str,
+    pid: int,
+    document_id: str,
+    editable: Sequence[str],
+) -> list[AnnotationSnapshot]:
+    """``target_proposals``, refused (``no_target_proposals``) only when the
+    version has neither proposals nor proposals waiting for a check there.
+
+    Issue 650: a correction that changes the words of every proposal leaves a
+    re-anchored set with needs-review items only; work from proposals moves
+    to that version all the same (its targets are then none)."""
+    targets = target_proposals(repo, conn, project, pid, document_id, editable)
+    if not targets and not has_review_items(conn, pid, document_id, editable):
+        raise no_target_proposals()
+    return targets
+
+
 def proposal_carry_plan(
     repo: Repository,
     conn: Connection,
@@ -215,9 +236,7 @@ def proposal_carry_plan(
     Raises:
         DomainError: ``TEXT_CHANGE_NOT_APPLICABLE`` (``no_target_proposals``).
     """
-    targets = target_proposals(repo, conn, project, pid, new.document_id, editable)
-    if not targets:
-        raise no_target_proposals()
+    targets = carry_targets(repo, conn, project, pid, new.document_id, editable)
     old_proposals = [
         s
         for s in repo.list_annotations_for_document(project, old.document_id)

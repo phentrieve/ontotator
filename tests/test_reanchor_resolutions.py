@@ -38,8 +38,9 @@ def from_proposals(db):
 
 def from_scratch(db):
     """Annotate assignments start from scratch: a further annotator then gets a
-    scratch assignment (the text's newest set holds only pending items, so a
-    text locked "from proposals" refuses NO_PROPOSALS_ON_VERSION, P3)."""
+    scratch assignment (the text is locked "from scratch"; locked "from
+    proposals", the set's pending items would make it one from proposals,
+    #650)."""
     with db.transaction() as conn:
         conn.execute(
             update(AssignmentRow)

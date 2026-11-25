@@ -33,7 +33,7 @@ import { DocumentsTable, tableRows, type ColumnSort, type HeaderSort, type Table
 import { consolidationStartedToast, panelStep } from "../documents/finalPanelText";
 import { finalChangedText, finalUndoAction } from "../documents/finalUndo";
 import { leadSteps, rowActionLabel, stepBlockedReason } from "../documents/nextStepLabels";
-import { TranslationCorrectionAction } from "../variants/TranslationCorrectionAction";
+import { AskReviewerDialog } from "../variants/TranslationCorrectionAction";
 import { DecisionBlock } from "../documents/FinalPanel";
 import { StageActions, type StageActionsProps } from "../documents/StageActions";
 import { WithdrawFinalDialog } from "../documents/WithdrawFinalDialog";
@@ -397,6 +397,16 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   /** Issue 555: "Edit the translation…" opens the choice, then the dialog of the chosen way; focus goes back to the button. */
   const editOpener = useRef<HTMLElement | null>(null);
   const versionReturnFocus = () => (editOpener.current?.isConnected ? editOpener.current : null);
+  /**
+   * Issue 613: after Fix typos saves, the refreshed card no longer holds the button that opened it. Focus goes to the
+   * card's next step (for example Assign annotation…), else to the card, instead of falling to the page.
+   */
+  const focusCardNext = () => window.requestAnimationFrame(() => {
+    const card = document.querySelector<HTMLElement>(".ui-dialog.text-card");
+    const active = document.activeElement;
+    if (!card || (active && active !== document.body && card.contains(active))) return;
+    (card.querySelector<HTMLElement>(".text-card-steps :is(button, a[href])") ?? card).focus();
+  });
   const textVersionTools = useMemo<TextVersionsTools | undefined>(() => {
     if (!inventory) return undefined;
     const variants = new Map<string, VariantSummary>(inventory.cases.flatMap(item => item.variants).map(variant => [variant.document_id, variant]));
@@ -781,8 +791,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     return newest ? textVersionTools.variants.get(newest.document_id) ?? null : null;
   };
   /** The reviewer was asked: the dialog's one button then reads "Close" ("Cancel" before, as in the neighbour dialogs). */
-  const [correctionDone, setCorrectionDone] = useState(false);
-  const closeCorrection = () => { setCorrectionFor(null); setCorrectionDone(false); reloadAfterAction(); };
+  const closeCorrection = () => { setCorrectionFor(null); reloadAfterAction(); };
 
   const [planFor, setPlanFor] = useState<DocumentRowView | null>(null);
   // A status-column sort of the loaded page (the server sorts by Text and Last activity only).
@@ -978,12 +987,10 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     {textChangeDialog}
     {planDialog}
     {resolveOptions && resolveRow && resolvePanel(resolveRow, resolveOptions)}
-    {correctionFor && textVersionTools && <Dialog open title={`Ask a reviewer to correct, ${rowName(correctionFor.row)}`} size="md"
-      onClose={closeCorrection} footer={<Button onClick={closeCorrection}>{correctionDone ? "Close" : "Cancel"}</Button>}
-      returnFocus={() => rowElement(rowKeyOf(correctionFor.row), "action") ?? rowElement(rowKeyOf(correctionFor.row), "header")}>
-      <TranslationCorrectionAction projectKey={projectKey} variant={correctionFor.variant} username={textVersionTools.username}
-        requiredLanguages={textVersionTools.requiredLanguages(correctionFor.variant.document_id)} defaultOpen inDialog onAssigned={() => setCorrectionDone(true)} />
-    </Dialog>}
+    {correctionFor && textVersionTools && <AskReviewerDialog title={`Ask a reviewer to correct, ${rowName(correctionFor.row)}`}
+      onClose={closeCorrection} returnFocus={() => rowElement(rowKeyOf(correctionFor.row), "action") ?? rowElement(rowKeyOf(correctionFor.row), "header")}
+      projectKey={projectKey} variant={correctionFor.variant} username={textVersionTools.username}
+      requiredLanguages={textVersionTools.requiredLanguages(correctionFor.variant.document_id)} />}
     {withdrawFor && withdrawRow && <WithdrawFinalDialog projectKey={projectKey} row={withdrawRow} onCancel={() => setWithdrawFor(null)}
       onStale={reloadAfterAction}
       onWithdrawn={() => {
@@ -1005,7 +1012,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       onUploaded={message => { setVersionAction(null); void refreshAll().then(() => showToast({ message })); }} />}
     {versionAction?.kind === "editorial" && <EditorialCorrectionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}
       onClose={() => setVersionAction(null)} returnFocus={versionReturnFocus}
-      onCorrected={message => { setVersionAction(null); void refreshAll().then(() => showToast({ message })); }} />}
+      onCorrected={message => { setVersionAction(null); void refreshAll().then(() => { showToast({ message }); focusCardNext(); }); }} />}
     {idsDialogOpen && <SelectByIdsDialog projectKey={projectKey} current={selection.cases} filters={filters} sort={request.sort ?? "case"} activeOnly={!notInPlanShown} onClose={() => setIdsDialogOpen(false)} onSelect={selectByIds} />}
   </section>;
 }

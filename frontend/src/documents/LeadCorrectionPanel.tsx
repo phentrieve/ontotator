@@ -150,7 +150,15 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
   // attempt; a refusal (LANGUAGE_CONFIRMATION_REQUIRED) still shows it when the preview did not load.
   const missing = asked ?? (preview?.missing_languages?.length ? preview.missing_languages : null);
   const unconfirmed = missing !== null && !confirmLanguage;
-  const blocked = unconfirmed || unavailable !== null;
+  /** Issue 613: a profile without a qualification is known before Open, so the action says so up front. */
+  const [unqualified, setUnqualified] = useState(false);
+  useEffect(() => {
+    let live = true;
+    Promise.resolve().then(() => api.getProfile()).then(profile => { if (live && profile) setUnqualified(!profile.qualification?.trim()); }, () => undefined);
+    return () => { live = false; };
+  }, []);
+  const noQualification = unqualified || failure?.kind === "qualification";
+  const blocked = unconfirmed || unavailable !== null || noQualification;
 
   // Rule 6 of docs/design.md › Panels and actions: in its own dialog, focus starts on the primary action.
   const primary = useRef<HTMLButtonElement>(null);
@@ -196,8 +204,8 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
     {previewError !== undefined && <ErrorNotice error={previewError} />}
     {missing !== null && <Checkbox id={`${id}-language`} label={`Correct despite missing ${missing.join(", ")} in your profile`}
       checked={confirmLanguage} onChange={event => setConfirmLanguage(event.target.checked)} />}
-    {failure?.kind === "qualification" && <InlineMessage tone="warning">
-      A translation review records your qualification. Your profile has none yet.{" "}
+    {noQualification && <InlineMessage tone="warning">
+      <span id={`${id}-qualification`}>A translation review records your qualification. Your profile has none yet.</span>{" "}
       <RouteLink route={{ name: "me", documents: projectKey }} className="btn btn-secondary btn-sm" onNavigate={onNavigate}>Add your qualification in your profile</RouteLink>
     </InlineMessage>}
     {failure?.kind === "not_available" && <InlineMessage tone="warning">{failure.text}</InlineMessage>}
@@ -207,8 +215,8 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
       <Button size="sm" onClick={onCancel}>Cancel</Button>
       <Button ref={primary} size="sm" variant="primary" loading={busy} aria-disabled={blocked || busy ? true : undefined}
         // Rule 4 of docs/design.md › Panels and actions: a greyed Open names its reason as description and tooltip.
-        aria-describedby={busy ? undefined : unconfirmed ? `${id}-unconfirmed` : unavailable !== null ? `${id}-unavailable` : undefined}
-        title={busy ? undefined : unconfirmed ? "Confirm the missing languages." : unavailable ?? undefined}
+        aria-describedby={busy ? undefined : noQualification ? `${id}-qualification` : unconfirmed ? `${id}-unconfirmed` : unavailable !== null ? `${id}-unavailable` : undefined}
+        title={busy ? undefined : noQualification ? "Add your qualification in your profile first." : unconfirmed ? "Confirm the missing languages." : unavailable ?? undefined}
         onClick={() => { void start(); }}>Open translation review</Button>
     </div>
   </div>;

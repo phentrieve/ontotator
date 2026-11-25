@@ -382,3 +382,34 @@ test('a reordered sentence: unchanged words are marked and re-created with one c
   await expect(panel(page).locator('[data-reanchor-status]')).toBeFocused();
   await page.screenshot({path:test.info().outputPath('reanchor-reordered.png')});
 });
+
+// Issue 652: at 1280 × 720 a row with two places keeps its actions on two lines, and "Show text change" compares and
+// marks the contexts at the place in use, in the row's type size.
+test('a row with two places fits two lines at 1280 x 720; its text change is anchored at the place (#652)',async({page})=>{
+  await page.setViewportSize({width:1280,height:720});
+  const s=await scenario(page,'?reordered=true');
+  const second=s.text.indexOf('Ataxia improved');
+  // The fixture has the word once: a second place, as the server lists one when the words occur twice nearby.
+  await page.route(/\/api\/v1\/assignments\/\d+\/open$/,async route=>{
+    const response=await route.fetch(),body=await response.json() as Opened;
+    for(const item of body.view.pending_reanchor_items ?? [])
+      if(item.suggestions?.length)item.suggestions=[...item.suggestions,[{start:second,end:second+6,text:'Ataxia'}]];
+    await route.fulfill({response,json:body});
+  });
+  await ready(page,s);
+  const row=panel(page).locator('ol > li').nth(1);
+  const actions=row.locator('.reanchor-row__actions');
+  await expect(actions.getByRole('button')).toHaveText(['Use this location','1 of 2 ›','Mark in text','Dismiss…']);
+  await expect(actions.getByRole('button',{name:'Next place (1 of 2)',exact:true})).toBeVisible();
+  const lines=await actions.getByRole('button').evaluateAll(buttons=>new Set(buttons.map(button=>Math.round(button.getBoundingClientRect().top))).size);
+  expect(lines).toBeLessThanOrEqual(2);
+  await row.getByText('Show text change',{exact:true}).click();
+  await expect(row.locator('[data-current-context] mark')).toHaveText('ataxia');
+  const diff=row.locator('.translation-diff');
+  expect(await diff.evaluate(view=>getComputedStyle(view).fontSize)).toBe('14px');
+  // The moved word is compared with itself: it is neither struck through nor inserted, but shown once, unchanged.
+  const changed=await diff.evaluate(view=>[...view.querySelectorAll('del, ins')].map(node=>node.querySelector('[data-text]')?.getAttribute('data-text') ?? node.textContent ?? ''));
+  expect(changed.filter(text=>/\bataxia\b/.test(text))).toEqual([]);
+  await expect(diff.locator('[data-diff-op="equal"]',{hasText:/\bataxia\b/})).toHaveCount(1);
+  await panel(page).screenshot({path:test.info().outputPath('reanchor-two-places-1280x720.png')});
+});

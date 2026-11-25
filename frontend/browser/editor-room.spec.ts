@@ -397,4 +397,34 @@ test.describe("editor room follow-ups (issue 596)", () => {
     // The tree keeps more than its least height.
     expect((await box(treePanel(page))).height).toBeGreaterThanOrEqual(220);
   });
+
+  // Issue 652: at 1280 × 600 the tree from a hit shows its rows and "Use this term instead…" in full, and the
+  // search field stays in view above it.
+  test("1280x600: the tree opened from a search hit keeps its rows and its action in view", async ({ page }) => {
+    await open(page, "room-hit-low", { width: 1280, height: 600 });
+    await selectText(page, 0, 9);
+    const field = page.getByLabel("Search term", { exact: true });
+    await field.fill("seiz");
+    const seizure = page.getByRole("option", { name: /^Seizure HP:0001250/ });
+    await seizure.hover();
+    await page.getByRole("button", { name: "Show in tree: Seizure" }).click();
+    await expect(treeItem(page, SEIZURE)).toHaveAttribute("aria-selected", "true");
+    const within = (locator: Locator, container: string) => locator.evaluate((element, selector) => {
+      const r = element.getBoundingClientRect(), outer = element.closest(selector)!.getBoundingClientRect();
+      return r.height > 0 && r.top >= outer.top - 1 && r.bottom <= outer.bottom + 1;
+    }, container);
+    const action = treePanel(page).getByRole("button", { name: /^Use this term/ });
+    await expect.poll(() => within(action, ".tree-host")).toBe(true);
+    await expect.poll(() => within(field, ".inspector-pane")).toBe(true);
+    // At least three whole rows of the tree.
+    const rows = await treePanel(page).locator(".tree-browser__tree").evaluate((tree) => {
+      const outer = tree.getBoundingClientRect();
+      return [...tree.querySelectorAll('[role="treeitem"]')].filter((row) => {
+        const r = (row.querySelector(".tree-row") ?? row).getBoundingClientRect();
+        return r.top >= outer.top - 1 && r.bottom <= outer.bottom + 1;
+      }).length;
+    });
+    await page.screenshot({ path: test.info().outputPath("tree-from-hit-1280x600.png") });
+    expect(rows).toBeGreaterThanOrEqual(3);
+  });
 });

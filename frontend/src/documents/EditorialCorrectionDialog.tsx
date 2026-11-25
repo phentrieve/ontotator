@@ -136,10 +136,14 @@ export function editorialConsequences(preview: EditorialCorrectionPreview): Edit
  * new version is not reviewed. A rejected or queried one stays to resolve, so its next review is assigned under Resolve….
  * Null for a version without a review.
  */
-export function reviewNote(decision: string | null | undefined, next: number): string | null {
+/**
+ * What happens to the submitted review. Issue 613: the pointer to Resolve… only while a rejection or query is still
+ * undecided (`decided`: the lead decided the query or accepted the version), since only then does the row offer it.
+ */
+export function reviewNote(decision: string | null | undefined, next: number, decided = false): string | null {
   if (!decision) return null;
   const stays = "A submitted translation review stays with the version it reviewed.";
-  return decision === "rejected" || decision === "query" ? `${stays} To have v${next} reviewed, use Resolve… › Other ways… › Assign a new review… on this row after saving.` : stays;
+  return (decision === "rejected" || decision === "query") && !decided ? `${stays} To have v${next} reviewed, use Resolve… › Other ways… › Assign a new review… on this row after saving.` : stays;
 }
 
 type CarryPerson = NonNullable<EditorialCorrectionPreview["annotation_carry"]>[number];
@@ -245,7 +249,7 @@ export function EditorialCorrectionDialog({ row, version, projectKey, onCorrecte
   const numbers = current ? numberNotice(current.number_changes) : null;
   const consequences = current ?? state;
   const work = consequences ? editorialConsequences(consequences) : null;
-  const review = reviewNote(version.latest_review_decision, next);
+  const review = reviewNote(version.latest_review_decision, next, !!version.query_decision || version.translation_status === "accepted");
 
   const save = async () => {
     setTried(true);

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { item } from './reanchorFixtures';
-import { ReanchorPanel, pendingDiffParts } from '../src/variants/ReanchorPanel';
+import { ReanchorPanel, anchoredDiffParts, pendingDiffParts } from '../src/variants/ReanchorPanel';
 import { historical } from './variantFixtures';
 import { shownText } from './support/shownText';
 
@@ -170,8 +170,10 @@ it('offers a suggested place first: Use this location, the next place, and Mark 
   const use = vi.fn(), select = vi.fn(), recreate = vi.fn();
   const mounted = render(<ReanchorPanel items={[item({ suggestions: places })]} labelFor={() => 'Finding'} onContext={() => {}}
     onUseLocation={use} onSelect={select} onRecreate={recreate} onDismiss={async () => {}} selectedKey={JSON.stringify([4, 'source/1', 'v1'])} placeOf={() => 1} />);
-  const actions = [...mounted.container.querySelectorAll('.reanchor-row__actions button')].map(button => button.textContent);
+  const actions = [...mounted.container.querySelectorAll('.reanchor-row__actions button')].map(button => button.getAttribute('aria-label') ?? button.textContent);
   expect(actions).toEqual(['Use this location', 'Next place (2 of 2)', 'Mark in text', 'Dismiss…']);
+  // Issue 652: the button shows only the count, so that it fits beside "Use this location".
+  expect(screen.getByRole('button', { name: 'Next place (2 of 2)' }).textContent).toBe('2 of 2 ›');
   expect(mounted.container.querySelector('[data-reanchor-primary]')?.textContent).toBe('Use this location');
   expect(mounted.container.querySelector('li')?.getAttribute('aria-current')).toBe('true');
   fireEvent.click(screen.getByRole('button', { name: 'Use this location' }));
@@ -188,4 +190,30 @@ it('names the new wording, or says that the words are not found, without a sugge
     .toEqual([' now “😀new”', ' · not found in the corrected text']);
   expect(screen.queryByRole('button', { name: 'Use this location' })).toBeNull();
   expect([...mounted.container.querySelectorAll('[data-reanchor-primary]')].map(node => node.textContent)).toEqual(['Mark in text', 'Mark in text']);
+});
+
+// Issue 652: a reordered sentence. The old window and the window at place 1 are compared around the moved word.
+it('compares and marks the contexts at the place in use, not word by word from their starts', () => {
+  const was = 'Physiotherapie wurde begonnen, nachdem eine Areflexie bemerkt wurde.';
+  const now = 'und eine leichte Hörminderung.\n\nAls eine Areflexie auffiel, wurde die Physiotherapie begonnen.';
+  const at = 200 + now.indexOf('Areflexie'), oldAt = 50 + was.indexOf('Areflexie');
+  const value = item({
+    old_context: { start: 50, end: 50 + was.length, text: was }, new_context: { start: 200, end: 200 + now.length, text: now },
+    old_mentions: [{ source_ref: { evidence_id: 'ev', version: 'e1' }, segments: [{ start: oldAt, end: oldAt + 9, text: 'Areflexie' }], cue_segments: [] }],
+    suggestions: [[{ start: at, end: at + 9, text: 'Areflexie' }]],
+    diff: [{ op: 'replace', old_start: 50, old_end: 50 + was.length, new_start: 200, new_end: 200 + now.length, old_text: was, new_text: now }],
+  });
+  const parts = anchoredDiffParts(value)!;
+  expect(parts.filter(part => part.op !== 'insert').map(part => part.text).join('')).toBe(was);
+  expect(parts.filter(part => part.op !== 'delete').map(part => part.text).join('')).toBe(now);
+  // The moved word is one equal part: the words before it are compared with those before it.
+  const index = parts.findIndex(part => part.op === 'equal' && part.text.includes('Areflexie'));
+  expect(parts.slice(0, index).filter(part => part.op !== 'insert').map(part => part.text).join('') + parts[index].text.split('Areflexie')[0])
+    .toBe(was.slice(0, was.indexOf('Areflexie')));
+  const mounted = render(<ReanchorPanel items={[value]} labelFor={() => 'Areflexia'} onContext={() => {}} />);
+  const marked = mounted.container.querySelector('[data-current-context] mark');
+  expect(marked?.textContent).toBe('Areflexie');
+  expect(mounted.container.querySelector('[data-current-context]')?.textContent).toBe(now);
+  // Without a place or new wording in the window there is no anchor: the whole windows are compared.
+  expect(anchoredDiffParts(item())).toBeNull();
 });

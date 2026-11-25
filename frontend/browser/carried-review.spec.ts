@@ -245,6 +245,14 @@ test("corrected text: placeholder with the specific reason; Mark in text, save, 
   await expect(recreated).toHaveAttribute("aria-pressed", "true");
   await expect(recreated).toContainText("Linked to carried Seizure (Round 1)");
   await expect(placeholder).toContainText("Linked to Seizure");
+  // Issue 652: the link is saved with the finding. After a reload both rows still read linked, and nothing was checked.
+  await expect(page.locator(".status-badge")).toContainText("Saved");
+  await page.reload();
+  await expect(progress(page)).toHaveText("0 of 1 checked");
+  await expect(placeholder).toContainText("Linked to Seizure");
+  await expect(recreated).toContainText("Linked to carried Seizure (Round 1)");
+  await expect(recreated).toContainText("Check needed");
+  await recreated.click();
   await carriedSection(page).getByRole("button", { name: "Mark as checked", exact: true }).click();
   await expect(progress(page)).toHaveText("All carried findings checked");
   await expect(recreated).toContainText("Checked");
