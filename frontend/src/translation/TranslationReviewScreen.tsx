@@ -35,7 +35,7 @@ import { SentenceCount, SentenceView } from "./SentenceMarks";
 import { InvisiblesKey } from "./invisibles";
 import { isChecked, rebaseMarks, resolveMarks, restored, splitSentences, storedMarks, toggled, withRange, type MarkState, type Sentence, type Side, type StoredMarks } from "./sentences";
 import { formatTime } from "../app/submissionLabels";
-import { alignTexts, assessAlignment, canSplitPair, carryChecks, mergedWithNext, pairsFit, pairsFromSentenceMarks, pairState, precheckAlignment, rebasePairs, securePairs, splitPair, textHash, toggledPair, unsurePairs, type LowConfidenceReason, type SegmentPair } from "./alignment";
+import { alignTexts, assessAlignment, isManual, canSplitPair, carryChecks, mergedWithNext, pairsFit, pairsFromSentenceMarks, pairState, precheckAlignment, rebasePairs, securePairs, splitPair, textHash, toggledPair, unsurePairs, type LowConfidenceReason, type SegmentPair } from "./alignment";
 import { PairCount, SegmentPairs } from "./SegmentPairs";
 import { FindBar, type FindBarHandle, type FindHit } from "./FindBar";
 import { indexCells } from "./textRanges";
@@ -102,9 +102,9 @@ const leadDecisions: readonly ReviewDecisionCode[] = ["accepted_corrected"];
 const storedOf = (value: CheckedSentences | undefined): StoredMarks => ({ source: value?.source ?? [], translation: value?.translation ?? [] });
 /** Segment pairs as the API stores them (issue 560) and back. */
 const pairsOfView = (view: SegmentPairsView): SegmentPair[] => (view.pairs ?? []).map(pair => ({ source: { ...pair.source }, translation: { ...pair.translation },
-  ...(pair.manual ? { manual: true } : {}), ...(pair.checked ? { checked: pair.checked } : {}) }));
+  ...(pair.origin && pair.origin !== "aligner" ? { origin: pair.origin } : {}), ...(pair.checked ? { checked: pair.checked } : {}) }));
 const viewOfPairs = (pairs: readonly SegmentPair[], source: string, target: string): SegmentPairsView => ({ source_hash: textHash(source), text_hash: textHash(target),
-  pairs: pairs.map(pair => ({ source: pair.source, translation: pair.translation, manual: pair.manual === true, checked: pair.checked ?? null })) });
+  pairs: pairs.map(pair => ({ source: pair.source, translation: pair.translation, origin: pair.origin ?? "aligner", checked: pair.checked ?? null })) });
 /** Why "Check by segment pairs" shows the usual texts (issue 560): the aligner is not confident about these texts. */
 const PAIRS_FALLBACK: Record<LowConfidenceReason, string> = {
   "empty": "one of the texts is empty.",
@@ -458,7 +458,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const realign = () => {
     const current = segmentPairsRef.current ?? [];
     // Manual and checked pairs stay; the aligner fills the stretches between them.
-    const fixed = current.filter(pair => pair.manual || pair.checked !== undefined);
+    const fixed = current.filter(pair => isManual(pair) || pair.checked !== undefined);
     const fresh = securePairs(workspace.source.text, text, alignTexts(workspace.source.text, text, alignOptions, fixed), alignOptions);
     const assessed = assessAlignment(workspace.source.text, text, fresh, alignOptions);
     setRealignKept(!assessed.usable);
@@ -874,6 +874,9 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     setMergeTrouble(null);
     if (next !== current) {
       rebaseTranslationMarks(current.text, next.text);
+      // A taken wording moves the segment pairs as an edit does (issue 560).
+      if (segmentPairsRef.current && next.text !== current.text)
+        changePairs(rebasePairs(segmentPairsRef.current, workspace.source.text, current.text, next.text, alignOptions));
       decisionStateRef.current = decisionNext; setDecisionState(decisionNext);
       const editor = document.getElementById("review-translation");
       if (editor instanceof HTMLTextAreaElement && document.activeElement === editor)

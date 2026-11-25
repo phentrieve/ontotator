@@ -57,10 +57,10 @@ describe("Find in the texts", () => {
     await frame();
     expect(press.defaultPrevented).toBe(false);
     expect(screen.queryByRole("search", { name: "Find in the texts" })).toBeNull();
-    // The editor's layout mirror is as before: aria-hidden, not inert.
+    // The editor's layout mirror is main's: aria-hidden and inert, so the browser's find counts a passage once (issue 598).
     const mirror = textbox.closest(".translation-editor")!.querySelector(".translation-editor-mirror")!;
     expect(mirror.getAttribute("aria-hidden")).toBe("true");
-    expect(mirror.hasAttribute("inert")).toBe(false);
+    expect(mirror.hasAttribute("inert")).toBe(true);
   });
 
   it("with segment pairs, Ctrl+F opens the bar, counts the hits of both columns, steps with Enter and closes with Escape", async () => {

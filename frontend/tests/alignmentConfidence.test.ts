@@ -138,7 +138,7 @@ describe("unsure pairs", () => {
     const document = dropped(ALIGNMENT_SAMPLE[0], 0);
     const en = sampleText(document, "en").text, de = sampleText(document, "de").text;
     const fresh = alignTexts(en, de, options);
-    const fixed = fresh.map(pair => ({ ...pair, manual: true }));
+    const fixed = fresh.map(pair => ({ ...pair, origin: "manual" as const }));
     expect(securePairs(en, de, fixed, options)).toEqual(fixed);
     expect(unsurePairs(en, de, fixed, options).size).toBe(0);
   });

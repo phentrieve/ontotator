@@ -23,13 +23,15 @@ const question = (took: boolean): ProblemReportView => ({
 
 afterEach(() => { cleanup(); window.localStorage.clear(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-function setup(took = false) {
+const sourceOf = (text?: string) => text ? { source: { ...reviewWorkspace().source, text } } : {};
+function setup(took = false, source?: string) {
   vi.spyOn(api, "listSourceObligations").mockResolvedValue([]);
   vi.spyOn(api, "listMyTasks").mockResolvedValue([]);
   vi.stubGlobal("matchMedia", vi.fn((query: string) => ({ matches: /min-width:\s*(\d+)px/.test(query) ? Number(/min-width:\s*(\d+)px/.exec(query)![1]) <= 1440 : false,
     media: query, onchange: null, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: () => true })));
   const listed = vi.spyOn(api, "listQuestions").mockResolvedValue([question(took)]);
-  const open = vi.spyOn(api, "openTranslationReview").mockResolvedValue(reviewWorkspace({ draft: { text: SAVED, form: {}, revision: 6 } }));
+  const open = vi.spyOn(api, "openTranslationReview").mockResolvedValue(reviewWorkspace({ draft: { text: SAVED, form: {}, revision: 6 },
+    ...sourceOf(source) }));
   const save = vi.spyOn(api, "saveTranslationReviewDraft");
   const routeLeaveRef: { current: RouteLeaveGuard | null } = { current: null };
   const leaveGuardRef: { current: ((proceed: () => void) => void) | null } = { current: null };
@@ -124,4 +126,24 @@ it("offers Keep my text for a change elsewhere it cannot merge, and saves the re
   expect(save).toHaveBeenLastCalledWith(17, expect.objectContaining({ expected_revision: 7, text: `${SAVED} mine and more` }));
   expect(status()).toBe("Saved");
   expect(screen.queryByText("This review was changed elsewhere")).toBeNull();
+});
+
+it("moves the segment pairs with a taken wording, as an edit does (issue 560)", async () => {
+  window.localStorage.setItem("ontotator.translationReview.segmentPairs.v1:alice", "1");
+  const savePairs = vi.spyOn(api, "saveSegmentPairs").mockImplementation(async (_id, pairs) => pairs);
+  const SOURCE = "Seizures since birth. Family member.";
+  const { open, save, listed } = setup(false, SOURCE);
+  await screen.findByRole("table", { name: "Segment pairs" });
+  await vi.waitFor(() => expect(savePairs).toHaveBeenCalled());
+  vi.useFakeTimers();
+  save.mockResolvedValue({ revision: 8 });
+  const first = savePairs.mock.calls.at(-1)![1];
+  expect(first.pairs!.at(-1)!.translation.end).toBe(SAVED.length);
+  open.mockResolvedValue(reviewWorkspace({ draft: { text: TAKEN, form: {}, revision: 7 }, ...sourceOf(SOURCE) }));
+  listed.mockResolvedValue([question(true)]);
+  await act(async () => { window.dispatchEvent(new Event("focus")); });
+  await settle();
+  const moved = savePairs.mock.calls.at(-1)![1];
+  expect(moved.pairs!.at(-1)!.translation.end).toBe(TAKEN.length);
+  expect(screen.getAllByRole("row").some(row => row.textContent?.includes(WORDING))).toBe(true);
 });

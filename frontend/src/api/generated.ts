@@ -11225,16 +11225,22 @@ export interface components {
          *
          *     ``checked`` is the hash of the pair's translation when the reviewer checked it,
          *     or ``stale`` for a pair joined from a partly checked one; the client compares it
-         *     with the hash of the passage now. ``manual``: made by a merge or a split.
+         *     with the hash of the passage now. ``origin`` says where the pair comes from:
+         *     ``aligner`` (the rule-based aligner of the browser), ``manual`` (made or changed
+         *     by the reviewer: a merge, a split, later pairing by hand) or ``pipeline`` (the
+         *     translation pipeline's alignment, not supplied yet). All three are accepted and
+         *     stored as they are, so pairs of the later sources need no data migration; any
+         *     other value is refused.
          */
         SegmentPair: {
             source: components["schemas"]["SegmentSpan"];
             translation: components["schemas"]["SegmentSpan"];
             /**
-             * Manual
-             * @default false
+             * Origin
+             * @default aligner
+             * @enum {string}
              */
-            manual: boolean;
+            origin: "aligner" | "manual" | "pipeline";
             /** Checked */
             checked?: string | null;
         };

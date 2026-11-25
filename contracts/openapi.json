@@ -32464,10 +32464,15 @@
           "translation": {
             "$ref": "#/components/schemas/SegmentSpan"
           },
-          "manual": {
-            "type": "boolean",
-            "title": "Manual",
-            "default": false
+          "origin": {
+            "type": "string",
+            "enum": [
+              "aligner",
+              "manual",
+              "pipeline"
+            ],
+            "title": "Origin",
+            "default": "aligner"
           },
           "checked": {
             "anyOf": [
@@ -32489,7 +32494,7 @@
           "translation"
         ],
         "title": "SegmentPair",
-        "description": "One aligned pair: a passage of the source and the passage of the translation.\n\n``checked`` is the hash of the pair's translation when the reviewer checked it,\nor ``stale`` for a pair joined from a partly checked one; the client compares it\nwith the hash of the passage now. ``manual``: made by a merge or a split."
+        "description": "One aligned pair: a passage of the source and the passage of the translation.\n\n``checked`` is the hash of the pair's translation when the reviewer checked it,\nor ``stale`` for a pair joined from a partly checked one; the client compares it\nwith the hash of the passage now. ``origin`` says where the pair comes from:\n``aligner`` (the rule-based aligner of the browser), ``manual`` (made or changed\nby the reviewer: a merge, a split, later pairing by hand) or ``pipeline`` (the\ntranslation pipeline's alignment, not supplied yet). All three are accepted and\nstored as they are, so pairs of the later sources need no data migration; any\nother value is refused."
       },
       "SegmentPairs": {
         "properties": {

@@ -58,11 +58,11 @@ describe("segment pairs", () => {
     const checked = toggledPair(pairs, TRANSLATION, 2);
     const merged = mergedWithNext(checked, TRANSLATION, 2);
     expect(merged).toHaveLength(3);
-    expect(merged[2]).toMatchObject({ manual: true, checked: STALE });
+    expect(merged[2]).toMatchObject({ origin: "manual", checked: STALE });
     expect(pairState(TRANSLATION, merged[2])).toBe("stale");
     const split = splitPair(merged, SOURCE, TRANSLATION, 2, options)!;
     expect(slices(split, SOURCE, TRANSLATION).slice(2)).toEqual([["She is much better this morning;", "Heute Morgen geht es ihr deutlich besser."], ["she can go home today.", "Sie kann heute nach Hause."]]);
-    expect(split.slice(2).every(pair => pair.manual)).toBe(true);
+    expect(split.slice(2).every(pair => pair.origin === "manual")).toBe(true);
     // A pair of one short clause on each side has nothing to split.
     expect(splitPair(pairs, SOURCE, TRANSLATION, 1, options)).toBeNull();
     // Merging two checked pairs keeps the check.
@@ -157,7 +157,7 @@ describe("Check by segment pairs", () => {
   it("uses stored pairs made on these texts, and finds in the cells of each side", async () => {
     const pairs = toggledPair(mergedWithNext(alignTexts(SOURCE, TRANSLATION, options), TRANSLATION, 0), TRANSLATION, 0);
     setup({ source_hash: textHash(SOURCE), text_hash: textHash(TRANSLATION),
-      pairs: pairs.map(pair => ({ source: pair.source, translation: pair.translation, manual: pair.manual === true, checked: pair.checked ?? null })) });
+      pairs: pairs.map(pair => ({ source: pair.source, translation: pair.translation, origin: pair.origin ?? "aligner", checked: pair.checked ?? null })) });
     fireEvent.click(await screen.findByRole("checkbox", { name: "Check by segment pairs" }));
     expect(rows()).toHaveLength(3);
     expect(screen.getByRole("button", { name: "Pair 1: Checked" })).toBeTruthy();

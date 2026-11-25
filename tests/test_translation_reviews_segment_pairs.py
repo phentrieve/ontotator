@@ -29,19 +29,19 @@ PAIRS = {
         {
             "source": {"start": 0, "end": 10},
             "translation": {"start": 0, "end": 12},
-            "manual": False,
+            "origin": "aligner",
             "checked": "cafebabe",
         },
         {
             "source": {"start": 11, "end": 20},
             "translation": {"start": 13, "end": 13},
-            "manual": True,
+            "origin": "manual",
             "checked": "stale",
         },
         {
             "source": {"start": 21, "end": 30},
             "translation": {"start": 14, "end": 30},
-            "manual": False,
+            "origin": "aligner",
             "checked": None,
         },
     ],
@@ -139,6 +139,10 @@ def test_http_contract_validates(review_env):
         {**PAIRS, "pairs": [{**first, "source": {"start": 5, "end": 2}}]},
         {**PAIRS, "pairs": [first, first]},
         {**PAIRS, "other": 1},
+        # Only the known origins; the prototype's "manual" flag is gone.
+        {**PAIRS, "pairs": [{**first, "origin": "imported"}]},
+        {**PAIRS, "pairs": [{**first, "origin": None}]},
+        {**PAIRS, "pairs": [{**first, "manual": True}]},
     ):
         assert client.put(url + "/segment-pairs", json=bad).status_code == 422
     bob = logged_in(env.app, "bob", assignments=[])
@@ -215,7 +219,7 @@ def test_two_tabs_keep_the_other_tabs_merge_and_this_tabs_checks():
     merged_pair = {
         "source": {"start": 11, "end": 30},
         "translation": {"start": 13, "end": 30},
-        "manual": True,
+        "origin": "manual",
         "checked": None,
     }
     stored = SegmentPairs.model_validate(
@@ -309,3 +313,35 @@ def test_a_client_that_does_not_know_pairs_keeps_them(review_env):
     again = client.get(url).json()
     assert again["segment_pairs"] == PAIRS
     assert set(again["draft"]["form"]) == {"decision", "clinical_change"}
+
+
+def test_every_origin_is_stored_as_it_is_and_none_reads_as_the_aligner(review_env):
+    """Pairs by hand (#640) and of the pipeline (ontospan#16) fit the stored format."""
+    env = review_env
+    client = logged_in(env.app, "alice", assignments=[])
+    url = f"/api/v1/translation-reviews/{env.ids['alice']}"
+    origins = ["pipeline", "manual", "aligner"]
+    pairs = {
+        **PAIRS,
+        "pairs": [
+            {**pair, "origin": origin}
+            for pair, origin in zip(PAIRS["pairs"], origins, strict=True)
+        ],
+    }
+    response = client.put(url + "/segment-pairs", json=pairs)
+    assert response.status_code == 200, response.text
+    stored = client.get(url).json()["segment_pairs"]
+    assert [pair["origin"] for pair in stored["pairs"]] == origins
+    assert [
+        pair["origin"] for pair in _draft_row(env)["form"][SEGMENT_PAIRS_KEY]["pairs"]
+    ] == origins
+    # A client that leaves the origin out sends pairs of the aligner.
+    bare = {
+        **PAIRS,
+        "pairs": [
+            {key: value for key, value in pair.items() if key != "origin"}
+            for pair in PAIRS["pairs"]
+        ],
+    }
+    response = client.put(url + "/segment-pairs", json=bare)
+    assert [pair["origin"] for pair in response.json()["pairs"]] == ["aligner"] * 3

@@ -57,9 +57,23 @@ PAIRS = {
         {
             "source": {"start": 0, "end": 10},
             "translation": {"start": 0, "end": 12},
-            "manual": False,
+            "origin": "aligner",
             "checked": "cafebabe",
-        }
+        },
+        # Each origin survives the round trip as it is: pairs made by hand (#640)
+        # and pairs of the pipeline alignment (ontospan#16) need no migration.
+        {
+            "source": {"start": 11, "end": 20},
+            "translation": {"start": 13, "end": 25},
+            "origin": "manual",
+            "checked": None,
+        },
+        {
+            "source": {"start": 21, "end": 30},
+            "translation": {"start": 26, "end": 40},
+            "origin": "pipeline",
+            "checked": "stale",
+        },
     ],
 }
 
@@ -138,6 +152,11 @@ def test_an_archive_with_segment_pairs_is_version_2_and_keeps_both_aids(
     assert form[SEGMENT_PAIRS_KEY] == SegmentPairs.model_validate(PAIRS).model_dump(
         mode="json"
     )
+    assert [pair["origin"] for pair in form[SEGMENT_PAIRS_KEY]["pairs"]] == [
+        "aligner",
+        "manual",
+        "pipeline",
+    ]
     assert form[CHECKED_SENTENCES_KEY] == {
         "source": [{"index": 0, "hash": "0badf00d"}],
         "translation": [],

@@ -1,6 +1,6 @@
 import { forwardRef, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { IconCheck, IconMore, IconWarning, MenuButton } from "../ui";
-import { pairState, type PairState, type SegmentPair } from "./alignment";
+import { isManual, pairState, type PairState, type SegmentPair } from "./alignment";
 import { invisibleNodes } from "./invisibles";
 import type { TextDiffPart } from "./textDiff";
 import "./translation.css";
@@ -109,7 +109,7 @@ export const SegmentPairs = forwardRef<HTMLDivElement, SegmentPairsProps>(functi
               : text(targetText, `t${index}`)}
           </div>;
       return <div key={`${pair.source.start}:${pair.translation.start}:${index}`} role="row" aria-rowindex={number + 1}
-        className={`segment-pair is-${state}${paragraph ? " starts-paragraph" : ""}${pair.manual ? " is-manual" : ""}${doubtful ? " is-unsure" : ""}`} data-pair={index}>
+        className={`segment-pair is-${state}${paragraph ? " starts-paragraph" : ""}${isManual(pair) ? " is-manual" : ""}${doubtful ? " is-unsure" : ""}`} data-pair={index}>
         <span role="cell" className="segment-pairs-number" aria-hidden="true">{number}</span>
         <div role="cell" className="segment-cell segment-cell--source" data-side="source" data-start={pair.source.start} lang={sourceLang}>
           {sourceText === "" ? <span className="segment-empty" data-gutter="">Not in the source</span> : text(sourceText, `s${index}`)}

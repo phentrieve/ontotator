@@ -87,7 +87,7 @@ describe("texts the aligner cannot pair", () => {
   it("stored pairs of an earlier text are kept on the server when the new text cannot be paired", async () => {
     window.localStorage.setItem(PAIRS_KEY, "1");
     const stored: SegmentPairsView = { source_hash: textHash(SOURCE), text_hash: textHash(TRANSLATION), pairs: alignTexts(SOURCE, TRANSLATION, { sourceLang: "en", targetLang: "de" })
-      .map(pair => ({ source: pair.source, translation: pair.translation, manual: false, checked: "0000abcd" })) };
+      .map(pair => ({ source: pair.source, translation: pair.translation, origin: "aligner", checked: "0000abcd" })) };
     const { savePairs } = setup({ translation: "", stored });
     await screen.findByRole("checkbox", { name: "Check by segment pairs" });
     await waitFor(() => expect(note()).toContain("one of the texts is empty."));

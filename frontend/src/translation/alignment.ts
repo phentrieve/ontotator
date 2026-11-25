@@ -23,12 +23,19 @@ export interface Segment extends Span {
 export interface SegmentPair {
   source: Span;
   translation: Span;
-  /** Made or changed by the reviewer (merge, split): kept as it is when the texts are aligned again. */
-  manual?: boolean;
+  /**
+   * Where the pair comes from; none means "aligner" (the rule-based aligner here). "manual": made or changed by the
+   * reviewer (merge, split, later pairing by hand), kept as it is when the texts are aligned again. "pipeline": from
+   * the translation pipeline's alignment (not supplied yet). Stored as is, so a later source needs no data migration.
+   */
+  origin?: PairOrigin;
   /** The hash of the pair's translation when it was checked; another hash now reads "changed since checked". */
   checked?: string;
 }
 export type PairState = "open" | "checked" | "stale";
+export type PairOrigin = "aligner" | "manual" | "pipeline";
+/** Made or changed by the reviewer: kept as it is when the texts are aligned again. */
+export const isManual = (pair: SegmentPair): boolean => pair.origin === "manual";
 /** The checked mark of a pair that was partly checked: no translation hashes to it, so it reads "changed since checked". */
 export const STALE = "stale";
 
@@ -292,9 +299,9 @@ export function toggledPair(pairs: readonly SegmentPair[], target: string, index
  * The pair that results from joining pairs: checked when every part was checked and is unchanged, "changed since
  * checked" when one part was checked (it needs another look), else open.
  */
-function joined(parts: readonly SegmentPair[], target: string, manual: boolean): SegmentPair {
+function joined(parts: readonly SegmentPair[], target: string, origin: PairOrigin): SegmentPair {
   const first = parts[0], last = parts[parts.length - 1];
-  const pair: SegmentPair = { source: { start: first.source.start, end: last.source.end }, translation: { start: first.translation.start, end: last.translation.end }, ...(manual ? { manual } : {}) };
+  const pair: SegmentPair = { source: { start: first.source.start, end: last.source.end }, translation: { start: first.translation.start, end: last.translation.end }, ...(origin !== "aligner" ? { origin } : {}) };
   const states = parts.map(part => pairState(target, part));
   if (states.every(state => state === "checked")) return { ...pair, checked: pairHash(target, pair) };
   // A hash no text has: the pair reads "changed since checked".
@@ -303,7 +310,7 @@ function joined(parts: readonly SegmentPair[], target: string, manual: boolean):
 }
 export function mergedWithNext(pairs: readonly SegmentPair[], target: string, index: number): SegmentPair[] {
   if (index < 0 || index + 1 >= pairs.length) return [...pairs];
-  return [...pairs.slice(0, index), joined(pairs.slice(index, index + 2), target, true), ...pairs.slice(index + 2)];
+  return [...pairs.slice(0, index), joined(pairs.slice(index, index + 2), target, "manual"), ...pairs.slice(index + 2)];
 }
 
 /**
@@ -332,8 +339,8 @@ export function splitPair(pairs: readonly SegmentPair[], source: string, target:
     if ((a === 0 || a === sources.length) && (b === 0 || b === targets.length)) continue;
     const half = (list: Segment[], from: number, to: number, whole: Span, side: "start" | "end"): Span => from < to
       ? { start: list[from].start, end: list[to - 1].end } : side === "start" ? { start: whole.start, end: whole.start } : { start: whole.end, end: whole.end };
-    const first: SegmentPair = { source: half(sources, 0, a, pair.source, "start"), translation: half(targets, 0, b, pair.translation, "start"), manual: true };
-    const second: SegmentPair = { source: half(sources, a, sources.length, pair.source, "end"), translation: half(targets, b, targets.length, pair.translation, "end"), manual: true };
+    const first: SegmentPair = { source: half(sources, 0, a, pair.source, "start"), translation: half(targets, 0, b, pair.translation, "start"), origin: "manual" };
+    const second: SegmentPair = { source: half(sources, a, sources.length, pair.source, "end"), translation: half(targets, b, targets.length, pair.translation, "end"), origin: "manual" };
     const length = (p: SegmentPair) => lengthCost(visibleLength(slice(source, p.source)), visibleLength(slice(target, p.translation)), ratio);
     const cost = length(first) + length(second) + (a === 0 || b === 0 || a === sources.length || b === targets.length ? 6 : 0);
     if (!best || cost < best.cost) best = { cost, parts: [first, second] };
@@ -541,7 +548,7 @@ function pairDoubt(source: string, target: string, pair: SegmentPair, judge: Pai
  */
 export function unsurePairs(source: string, target: string, pairs: readonly SegmentPair[], options: AlignOptions = {}): Set<number> {
   const judge = judgeOf(source, target, options), result = new Set<number>();
-  const free = (pair: SegmentPair | undefined) => pair !== undefined && !pair.manual && pair.checked === undefined;
+  const free = (pair: SegmentPair | undefined) => pair !== undefined && !isManual(pair) && pair.checked === undefined;
   pairs.forEach((pair, index) => {
     if (!free(pair) || !pairDoubt(source, target, pair, judge)) return;
     result.add(index);
@@ -557,7 +564,7 @@ export function unsurePairs(source: string, target: string, pairs: readonly Segm
  */
 export function securePairs(source: string, target: string, pairs: readonly SegmentPair[], options: AlignOptions = {}): SegmentPair[] {
   const judge = judgeOf(source, target, options);
-  const free = (pair: SegmentPair | undefined) => pair !== undefined && !pair.manual && pair.checked === undefined;
+  const free = (pair: SegmentPair | undefined) => pair !== undefined && !isManual(pair) && pair.checked === undefined;
   const join = (parts: readonly SegmentPair[]): SegmentPair => ({ source: { start: parts[0].source.start, end: parts[parts.length - 1].source.end },
     translation: { start: parts[0].translation.start, end: parts[parts.length - 1].translation.end } });
   const result = [...pairs];

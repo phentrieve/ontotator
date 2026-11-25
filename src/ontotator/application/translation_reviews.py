@@ -143,6 +143,10 @@ MAX_SEGMENT_PAIRS = 5000
 AID_KEYS = (CHECKED_SENTENCES_KEY, SEGMENT_PAIRS_KEY)
 
 
+# Where a segment pair comes from (see SegmentPair).
+SegmentPairOrigin = Literal["aligner", "manual", "pipeline"]
+
+
 class SegmentSpan(BaseModel):
     """A passage of one text, in UTF-16 code units as the browser counts them."""
 
@@ -162,13 +166,18 @@ class SegmentPair(BaseModel):
 
     ``checked`` is the hash of the pair's translation when the reviewer checked it,
     or ``stale`` for a pair joined from a partly checked one; the client compares it
-    with the hash of the passage now. ``manual``: made by a merge or a split.
+    with the hash of the passage now. ``origin`` says where the pair comes from:
+    ``aligner`` (the rule-based aligner of the browser), ``manual`` (made or changed
+    by the reviewer: a merge, a split, later pairing by hand) or ``pipeline`` (the
+    translation pipeline's alignment, not supplied yet). All three are accepted and
+    stored as they are, so pairs of the later sources need no data migration; any
+    other value is refused.
     """
 
     model_config = ConfigDict(extra="forbid")
     source: SegmentSpan
     translation: SegmentSpan
-    manual: bool = False
+    origin: SegmentPairOrigin = "aligner"
     checked: str | None = Field(default=None, pattern=r"^(?:[0-9a-f]{8}|stale)$")
 
 
