@@ -22,6 +22,17 @@ function renderResolve(overrides: Partial<ResolveTranslationProps> = {}) {
   return props;
 }
 
+/** The Resolve dialog (issue 554: a dialog, not a panel under the row). */
+const resolveDialog = () => screen.getByRole("dialog", { name: "Resolve rejected translation, case-0101 de" });
+/** The visible actions of the dialog's footer, without its Close button. */
+const footerButtons = () => [...resolveDialog().querySelectorAll(".modal-actions button")].map(button => button.textContent);
+/** Opens "Other ways…" and returns the names of its items. */
+function otherWays(): string[] {
+  fireEvent.click(within(resolveDialog()).getByRole("button", { name: "Other ways to resolve case-0101 de" }));
+  return screen.getAllByRole("menuitem").map(item => item.getAttribute("aria-label") ?? item.textContent ?? "");
+}
+const chooseOther = (name: string) => fireEvent.click(screen.getByRole("menuitem", { name }));
+
 const discarded = (overrides: Partial<DiscardResult> = {}): DiscardResult => ({
   case_id: "case-0101", language: "de", discarded_document_ids: ["case-0101-de"],
   flags: { review: false, annotate: false, review_applicable: true, discarded: true }, revision: 4, withdrawn: [], ...overrides,
@@ -34,14 +45,16 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-it("offers exactly three options", () => {
+it("one primary action, the other ways under Other ways… with one line each (issue 556)", () => {
   const props = renderResolve();
-  const box = screen.getByRole("group", { name: "Resolve rejected translation, case-0101 de" });
-  expect(within(box).getAllByRole("button").map(button => button.textContent)).toEqual([
-    "Assign a new review…", "Correct the translation…", "Discard the de translation…", "Cancel",
-  ]);
-  expect(within(box).queryByText(/accept/i)).toBeNull();
-  fireEvent.click(within(box).getByRole("button", { name: "Assign a new review…" }));
+  expect(footerButtons()).toEqual(["Other ways…", "Cancel", "Correct it myself (counts as accepted)…"]);
+  expect(within(resolveDialog()).getByRole("button", { name: "Correct it myself (counts as accepted)…" }).className).toContain("btn-primary");
+  expect(within(resolveDialog()).queryByText(/accept the reviewer/i)).toBeNull();
+  expect(otherWays()).toEqual(["Assign a new review…", "Discard the de translation…"]);
+  // Each other way says when to use it, as its accessible description (shown in the open menu only).
+  expect(screen.getByRole("menuitem", { name: "Assign a new review…" }).getAttribute("aria-describedby")).toBeTruthy();
+  expect(screen.getByText("Another reviewer reviews v1.")).toBeTruthy();
+  chooseOther("Assign a new review…");
   expect(props.onAssignReview).toHaveBeenCalled();
 });
 
@@ -56,17 +69,16 @@ it("offers Reopen of the reviewer who rejected it, with an optional reason (#340
     work({ assignment_id: 14, document_id: "case-0101-de", task: "annotate", status: "submitted" }),
   ] };
   const props = renderResolve({ row });
-  const box = screen.getByRole("group", { name: "Resolve rejected translation, case-0101 de" });
-  expect(within(box).getAllByRole("button").map(button => button.textContent)).toEqual([
-    "Reopen Ana Weber's review…", "Assign a new review…", "Correct the translation…", "Discard the de translation…", "Cancel",
-  ]);
-  fireEvent.click(within(box).getByRole("button", { name: "Reopen Ana Weber's review…" }));
+  expect(otherWays()).toEqual(["Reopen Ana Weber's review…", "Assign a new review…", "Discard the de translation…"]);
+  expect(screen.getByText("Ana Weber reviews v1 again, from its current text.")).toBeTruthy();
+  chooseOther("Reopen Ana Weber's review…");
   const confirm = screen.getByRole("group", { name: "Reopen Ana Weber's review of case-0101 de" });
   expect(within(confirm).getByText("Ana Weber reviews v1 again, starting from its current text. The earlier decision stays in the history.")).toBeTruthy();
-  // Cancel returns to the options with focus on the Reopen option.
+  // Cancel returns to the options with focus on Other ways….
   fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
-  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Reopen Ana Weber's review…" })));
-  fireEvent.click(screen.getByRole("button", { name: "Reopen Ana Weber's review…" }));
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Other ways to resolve case-0101 de" })));
+  otherWays();
+  chooseOther("Reopen Ana Weber's review…");
   const again = screen.getByRole("group", { name: "Reopen Ana Weber's review of case-0101 de" });
   fireEvent.change(within(again).getByLabelText("Reason (optional)"), { target: { value: "Please check the dosage" } });
   fireEvent.click(within(again).getByRole("button", { name: "Reopen review" }));
@@ -78,7 +90,8 @@ it("a failed reopen stays open with the error", async () => {
   vi.spyOn(api, "reopenAssignment").mockRejectedValue(new ApiError(409, "Only submitted work can be reopened.", "ASSIGNMENT_NOT_SUBMITTED"));
   const row = { ...rejected(), work: [work({ assignment_id: 12, document_id: "case-0101-de", task: "translation_review", status: "submitted", person: { pseudonym: "ann-0004", display_name: "Ana Weber", is_me: false } })] };
   const props = renderResolve({ row });
-  fireEvent.click(screen.getByRole("button", { name: "Reopen Ana Weber's review…" }));
+  otherWays();
+  chooseOther("Reopen Ana Weber's review…");
   fireEvent.click(screen.getByRole("button", { name: "Reopen review" }));
   expect(await screen.findByText("Only submitted work can be reopened.")).toBeTruthy();
   expect(props.onDone).not.toHaveBeenCalled();
@@ -89,41 +102,40 @@ it("names who waits for the decision (#234)", () => {
   const person = (display_name: string) => ({ username: display_name.toLowerCase(), pseudonym: `ann-${display_name.length}`, display_name });
   const row = { ...rejected(), stages: stages({ annotation: stageCell("after_review", "waiting", { people: [person("Ana Weber")] as never }) }) };
   renderResolve({ row });
-  const box = screen.getByRole("group", { name: "Resolve rejected translation, case-0101 de" });
+  const box = resolveDialog();
   expect(within(box).getByText("Ana Weber is waiting for this decision to start the annotation.")).toBeTruthy();
   cleanup();
   renderResolve();
   expect(screen.queryByText(/waiting for this decision/)).toBeNull();
 });
 
-it("Correct the translation… opens the panel", async () => {
+it("Correct it myself (counts as accepted)… opens the panel in the dialog", async () => {
   vi.spyOn(api, "getVariantMetadata").mockResolvedValue({ document_id: "case-0101-de", text_sha256: "sha-v1" } as VariantSummary);
   vi.spyOn(api, "startLeadCorrection").mockResolvedValue({ id: 41 } as AssignmentView);
   const props = renderResolve();
-  fireEvent.click(screen.getByRole("button", { name: "Correct the translation…" }));
+  fireEvent.click(screen.getByRole("button", { name: "Correct it myself (counts as accepted)…" }));
   expect(screen.queryByRole("group", { name: "Resolve rejected translation, case-0101 de" })).toBeNull();
-  const panel = screen.getByRole("group", { name: "Correct the translation, case-0101 de" });
+  const panel = within(resolveDialog()).getByRole("group", { name: "Correct it myself (counts as accepted), case-0101 de" });
   expect(within(panel).getByText(/You review v1 yourself/)).toBeTruthy();
   expect(props.onNavigate).not.toHaveBeenCalled();
   fireEvent.click(within(panel).getByRole("button", { name: "Open translation review" }));
   await waitFor(() => expect(props.onNavigate).toHaveBeenCalledWith({ name: "task", assignmentId: 41 }));
   expect(api.startLeadCorrection).toHaveBeenCalledWith("p", "case-0101-de", { expected_text_sha256: "sha-v1", confirm_language: false });
 
-  // Cancel returns to the options with focus on "Correct the translation…".
+  // Cancel returns to the options with focus on the primary action.
   cleanup();
   renderResolve();
-  fireEvent.click(screen.getByRole("button", { name: "Correct the translation…" }));
-  fireEvent.click(within(screen.getByRole("group", { name: "Correct the translation, case-0101 de" })).getByRole("button", { name: "Cancel" }));
-  const box = screen.getByRole("group", { name: "Resolve rejected translation, case-0101 de" });
-  await waitFor(() => expect(document.activeElement).toBe(within(box).getByRole("button", { name: "Correct the translation…" })));
+  fireEvent.click(screen.getByRole("button", { name: "Correct it myself (counts as accepted)…" }));
+  fireEvent.click(within(screen.getByRole("group", { name: "Correct it myself (counts as accepted), case-0101 de" })).getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(document.activeElement).toBe(within(resolveDialog()).getByRole("button", { name: "Correct it myself (counts as accepted)…" })));
 });
 
 it("reads Continue your correction while the lead holds one", () => {
   vi.spyOn(api, "startLeadCorrection");
   const held = rejectedRow("case-0101", "de", { correcting: true });
   const props = renderResolve({ row: { ...held, next_step: stepOf("resolve_rejected", { document_id: "case-0101-de" }) } });
-  const box = screen.getByRole("group", { name: "Resolve rejected translation, case-0101 de" });
-  expect(within(box).queryByRole("button", { name: "Correct the translation…" })).toBeNull();
+  const box = resolveDialog();
+  expect(within(box).queryByRole("button", { name: /Correct it myself/ })).toBeNull();
   fireEvent.click(within(box).getByRole("button", { name: "Continue your correction" }));
   expect(props.onNavigate).toHaveBeenCalledWith({ name: "task", assignmentId: 41 });
   expect(api.startLeadCorrection).not.toHaveBeenCalled();
@@ -133,9 +145,9 @@ it("an ordinary open review of the lead (also an annotator) is not their correct
   const held = rejectedRow("case-0101", "de", { correcting: true });
   const row = { ...held, next_step: stepOf("resolve_rejected", { document_id: "case-0101-de" }), work: held.work.map(item => ({ ...item, lead_correction: false })) };
   renderResolve({ row });
-  const box = screen.getByRole("group", { name: "Resolve rejected translation, case-0101 de" });
+  const box = resolveDialog();
   expect(within(box).queryByRole("button", { name: "Continue your correction" })).toBeNull();
-  expect(within(box).getByRole("button", { name: "Correct the translation…" })).toBeTruthy();
+  expect(within(box).getByRole("button", { name: "Correct it myself (counts as accepted)…" })).toBeTruthy();
 });
 
 it("discards with a required reason and shows consequences", async () => {
@@ -145,10 +157,14 @@ it("discards with a required reason and shows consequences", async () => {
   };
   vi.mocked(api.discardVariant).mockRejectedValueOnce(new ApiError(409, "confirm", "WORK_PLAN_CONFIRMATION_REQUIRED", consequences)).mockResolvedValueOnce(discarded());
   const props = renderResolve();
-  fireEvent.click(screen.getByRole("button", { name: "Discard the de translation…" }));
+  otherWays();
+  chooseOther("Discard the de translation…");
   const confirm = screen.getByRole("group", { name: "Discard the de translation of case-0101" });
   const discard = within(confirm).getByRole("button", { name: "Discard" });
   expect(discard.getAttribute("aria-disabled")).toBe("true");
+  // Rule 4 (issue 591): the reason is the description and the tooltip.
+  expect(document.getElementById(discard.getAttribute("aria-describedby") ?? "")?.textContent).toBe("Enter a reason.");
+  expect(discard.getAttribute("title")).toBe("Enter a reason.");
   fireEvent.click(discard);
   expect(api.discardVariant).not.toHaveBeenCalled();
   fireEvent.change(within(confirm).getByLabelText("Reason (required)"), { target: { value: "Wrong source" } });
@@ -196,15 +212,15 @@ it("Assign review or accept… offers Turn translation review on or the external
   await waitFor(() => expect(second.onDone).toHaveBeenCalledWith("case-0101 de accepted as reviewed outside Ontotator.", { caseId: "case-0101", revision: 4 }));
 });
 
-it("Cancel in the discard step returns to the three options with focus on Discard", async () => {
+it("Cancel in the discard step returns to the options with focus on Other ways…", async () => {
   const props = renderResolve();
-  fireEvent.click(screen.getByRole("button", { name: "Discard the de translation…" }));
+  otherWays();
+  chooseOther("Discard the de translation…");
   const confirm = screen.getByRole("group", { name: "Discard the de translation of case-0101" });
   fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
   expect(props.onCancel).not.toHaveBeenCalled();
-  const box = screen.getByRole("group", { name: "Resolve rejected translation, case-0101 de" });
-  expect(within(box).getAllByRole("button")).toHaveLength(4);
-  await waitFor(() => expect(document.activeElement).toBe(within(box).getByRole("button", { name: "Discard the de translation…" })));
+  expect(footerButtons()).toHaveLength(3);
+  await waitFor(() => expect(document.activeElement).toBe(within(resolveDialog()).getByRole("button", { name: "Other ways to resolve case-0101 de" })));
 });
 
 it("announces Saving… through the page and has no status region of its own", async () => {
@@ -232,40 +248,30 @@ it("reports a plan changed elsewhere with the current revisions and the message"
   expect(screen.queryByRole("alert")).toBeNull();
 });
 
-// ---- Documents overview O4c: the Resolve panel is inline under the row (Change 13) ----
+// ---- Issue 554: Resolve… is a dialog; Cancel, Close and Escape cancel it ----
 
-it("Resolve… renders inline under the row with the lead-correction option", async () => {
-  vi.spyOn(api, "getVariantMetadata").mockResolvedValue({ document_id: "case-0101-de", text_sha256: "sha-v1" } as VariantSummary);
-  const { container } = render(<div className="documents-row-notice-slot"><ResolveTranslation mode="resolve" row={rejected()} projectKey="p" revision={3}
-    onAssignReview={vi.fn()} onNavigate={vi.fn()} onDone={vi.fn()} onChanged={vi.fn()} onAnnounce={vi.fn()} onCancel={vi.fn()} /></div>);
-  const slot = container.firstElementChild as HTMLElement;
-  const box = within(slot).getByRole("group", { name: "Resolve rejected translation, case-0101 de" });
-  // No stage block or expansion around it: the options are the panel itself.
-  expect(box.closest(".stage-block, .expanded-row")).toBeNull();
-  fireEvent.click(within(box).getByRole("button", { name: "Correct the translation…" }));
-  // F1: the lead-correction panel replaces the options in the same inline place.
-  const panel = within(slot).getByRole("group", { name: "Correct the translation, case-0101 de" });
-  await waitFor(() => expect(document.activeElement).toBe(within(panel).getByRole("heading", { name: "Correct the translation, case-0101 de" })));
-});
-
-it("focus goes to the inline panel heading (F5)", async () => {
-  renderResolve();
-  const heading = screen.getByRole("heading", { name: "Resolve rejected translation, case-0101 de" });
-  await waitFor(() => expect(document.activeElement).toBe(heading));
-  expect(heading.getAttribute("tabindex")).toBe("-1");
+it("opens as a dialog with focus on the primary action; Cancel, Close and Escape cancel", async () => {
+  const props = renderResolve();
+  await waitFor(() => expect(document.activeElement).toBe(within(resolveDialog()).getByRole("button", { name: "Correct it myself (counts as accepted)…" })));
+  fireEvent.click(within(resolveDialog()).getByRole("button", { name: "Cancel" }));
+  fireEvent.click(within(resolveDialog()).getByRole("button", { name: "Close" }));
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+  expect(props.onCancel).toHaveBeenCalledTimes(3);
   cleanup();
   renderResolve({ mode: "not_accepted", row: notAccepted() });
-  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Translation not accepted, case-0101 de" })));
+  expect(screen.getByRole("dialog", { name: "Translation not accepted, case-0101 de" })).toBeTruthy();
 });
 
-it("heads the options at level 3 under the table and at level 5 in a card (heading order)", () => {
-  renderResolve();
-  expect(screen.getByRole("heading", { level: 3, name: "Resolve rejected translation, case-0101 de" })).toBeTruthy();
-  cleanup();
-  renderResolve({ headingLevel: 5 });
-  expect(screen.getByRole("heading", { level: 5, name: "Resolve rejected translation, case-0101 de" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Correct the translation…" }));
-  expect(screen.getByRole("heading", { level: 5, name: "Correct the translation, case-0101 de" })).toBeTruthy();
+it("a rejected correction of an accepted version names the other consequence: reviewed again", () => {
+  const base = rejected();
+  const row = { ...base, versions: [
+    version({ document_id: "case-0101-de-v1", version: 1, chain_name: "DeepL", origin: "machine_translation", translation_status: "accepted", is_newest_in_chain: false }),
+    version({ document_id: "case-0101-de", version: 2, chain_name: "DeepL", origin: "correction", derived_from: "case-0101-de-v1", translation_status: "reviewed", latest_review_decision: "rejected" }),
+  ] };
+  renderResolve({ row });
+  fireEvent.click(within(resolveDialog()).getByRole("button", { name: "Correct it myself (reviewed again)…" }));
+  // Rule 2 (issue 591): the step repeats the label of the button.
+  expect(within(resolveDialog()).getByRole("heading", { name: "Correct it myself (reviewed again), case-0101 de" })).toBeTruthy();
 });
 
 it("quotes the reviewer's reason and categories above the options, named by the review's work item", async () => {

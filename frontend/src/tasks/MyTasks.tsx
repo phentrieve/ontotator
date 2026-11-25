@@ -16,6 +16,7 @@ import { onSpaceActivate } from "../ui/spaceActivates";
 import { annotationTaskName } from "../editor/modes";
 import { PracticeCard, PracticeGroup } from "../practice/PracticeOnMyTasks";
 import { usePractice } from "../practice/usePractice";
+import { NOTIFICATIONS_ARRIVED } from "../notifications/notificationsEvents";
 import { notifyTasksChanged } from "./tasksEvents";
 import { reasonAdditionLines, reopenedText, secondReviewText } from "./LeadReason";
 import { pauseMarks } from "./pauseLabels";
@@ -120,9 +121,10 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
   useEffect(() => {
     let active = true;
     let generation = 0;
-    const load = async () => {
+    // A reload in the background keeps the list on screen until the new one is there (a failure shows as before).
+    const load = async (quiet = false) => {
       const request = ++generation;
-      setState({ kind: "loading" });
+      if (!quiet) setState({ kind: "loading" });
       try {
         const tasks = await api.listMyTasks();
         if (active && request === generation) { setState({ kind: "ready", tasks }); setLoads(value => value + 1); }
@@ -130,13 +132,19 @@ export function MyTasks({ project, status, projects, onNavigate, username }: MyT
         if (active && request === generation) setState({ kind: "error", error });
       }
     };
-    const visible = () => { if (document.visibilityState === "visible") void load(); };
+    // Issue 620: as the bell and "My tasks (n)", the list follows window focus and a new notification.
+    const again = () => { void load(true); };
+    const visible = () => { if (document.visibilityState === "visible") again(); };
     void load();
     document.addEventListener("visibilitychange", visible);
-    const stopRestored = onSessionRestored(() => { void load(); });
+    window.addEventListener("focus", again);
+    window.addEventListener(NOTIFICATIONS_ARRIVED, again);
+    const stopRestored = onSessionRestored(again);
     return () => {
       active = false;
       document.removeEventListener("visibilitychange", visible);
+      window.removeEventListener("focus", again);
+      window.removeEventListener(NOTIFICATIONS_ARRIVED, again);
       stopRestored();
     };
   }, [retry]);

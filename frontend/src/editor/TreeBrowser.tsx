@@ -19,6 +19,7 @@ import {
 } from "./treeState";
 import { LanguageFlag } from "../ui/LanguageTag";
 import { MODIFIER_IN_CHANGE } from "./SearchPanel";
+import { useTermIdDisplay } from "./termIds";
 import { takeEffect, treeModeNote, type TreeMode } from "./treeMode";
 
 /**
@@ -94,6 +95,7 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
   languages = [],
   username,
 }) => {
+  const showTermId = useTermIdDisplay();
   const [data, setData] = useState<TreeData>(emptyTree);
   // Closed, the details keep the name and id only and the tree gets the room.
   const [detailsOpen, setDetailsOpen] = useState(() => detailsStartOpen(username));
@@ -339,7 +341,7 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
                     </Button>
                   </div>
                   <div className="tree-detail__ids">
-                    <div className="tree-detail__id">{detail.term_id}</div>
+                    <div className="tree-detail__id" title={detail.term_id}>{showTermId(detail.term_id)}</div>
                     {detail.external_url && (
                       <a
                         className="tree-external"
@@ -418,7 +420,7 @@ export const TreeBrowser: React.FC<TreeBrowserProps> = ({
                   event.stopPropagation();
                   cancelConfirm();
                 }}>
-                <p id="tree-take-effect" className="tree-detail__effect">{takeEffect(takeMode, detail.label, detail.term_id)}</p>
+                <p id="tree-take-effect" className="tree-detail__effect">{takeEffect(takeMode, detail.label, showTermId(detail.term_id))}</p>
                 <Button ref={confirmButton} type="button" variant="primary" disabled={saving} onClick={() => { void assignTerm(); }}>
                   Confirm
                 </Button>

@@ -258,8 +258,11 @@ export type QueryDecisionRequest = components["schemas"]["QueryDecisionRequest"]
 export type QueryDecisionResult = components["schemas"]["QueryDecisionResult"];
 export type CorrectionReasonAdditionView = components["schemas"]["CorrectionReasonAdditionView"];
 export type ResolveSourceObligationRequest = components["schemas"]["ResolveSourceObligationRequest"];
-export type ProblemReportRequest = components["schemas"]["ProblemReportRequest"];
-export type ProblemActionRequest = components["schemas"]["ProblemActionRequest"];
+type Schemas = components["schemas"];
+/** Issue 553: `kind` defaults to "problem" on the server; a text problem report leaves it out. */
+export type ProblemReportRequest = Omit<Schemas["ProblemReportRequest"], "kind"> & Partial<Pick<Schemas["ProblemReportRequest"], "kind">>;
+/** `take_proposed_text` (issue 553, with `action: "answer"`) defaults to false on the server. */
+export type ProblemActionRequest = Omit<Schemas["ProblemActionRequest"], "take_proposed_text"> & Partial<Pick<Schemas["ProblemActionRequest"], "take_proposed_text">>;
 export type ProblemReportView = components["schemas"]["ProblemReportView"];
 export type ReportEventView = components["schemas"]["ReportEventView"];
 export type ReportHoldView = components["schemas"]["ReportHoldView"];
@@ -347,6 +350,9 @@ export type TechnicalReportReceipt = components["schemas"]["TechnicalReportRecei
 export type TechnicalReportView = components["schemas"]["TechnicalReportView"];
 export type OwnTechnicalReportView = components["schemas"]["OwnTechnicalReportView"];
 export type TechnicalReportStatus = TechnicalReportView["status"];
+export type NotificationView = components["schemas"]["NotificationView"];
+export type NotificationList = components["schemas"]["NotificationList"];
+export type NotificationSummary = components["schemas"]["NotificationSummary"];
 export type { LastApiError };
 export { lastApiError };
 export type CreateUserRequest = components["schemas"]["CreateUserRequest"];
@@ -844,6 +850,24 @@ export class ApiClient {
   /** The caller's own technical reports, newest first (issue 269): reference, text and status only. */
   async listMyTechnicalReports(offset = 0): Promise<OwnTechnicalReportView[]> {
     return this.request<OwnTechnicalReportView[]>(`/api/v1/me/technical-reports?limit=${TECHNICAL_REPORTS_PAGE}&offset=${offset}`, { method: "GET" });
+  }
+
+  /** The header bell (issue 557): the newest notifications and the unread count. */
+  async listNotifications(): Promise<NotificationList> {
+    return this.request<NotificationList>("/api/v1/me/notifications", { method: "GET" });
+  }
+
+  async notificationSummary(): Promise<NotificationSummary> {
+    return this.request<NotificationSummary>("/api/v1/me/notifications/summary", { method: "GET" });
+  }
+
+  async markNotificationRead(id: number): Promise<NotificationSummary> {
+    return this.request<NotificationSummary>(`/api/v1/me/notifications/${id}/read`, { method: "POST" });
+  }
+
+  /** `upTo`: the newest id the list showed, so one that arrived since stays unread. */
+  async markAllNotificationsRead(upTo?: number): Promise<NotificationSummary> {
+    return this.request<NotificationSummary>("/api/v1/me/notifications/read-all", { method: "POST", body: JSON.stringify(upTo === undefined ? {} : { up_to: upTo }) });
   }
 
   async adminListTechnicalReports(status?: TechnicalReportStatus): Promise<TechnicalReportView[]> {
@@ -1510,6 +1534,14 @@ export class ApiClient {
 
   async listTaskProblemReports(projectKey: string, assignmentId: number): Promise<ProblemReportView[]> {
     const query = new URLSearchParams({ assignment_id: String(assignmentId) });
+    return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/problem-reports?${query}`, { method: "GET" });
+  }
+
+  /** Issue 553: questions to the lead (problem reports of kind "question"); a lead reads all, others their own. */
+  async listQuestions(projectKey: string, filter: { assignmentId?: number; state?: "open" | "resolved" | "withdrawn" } = {}): Promise<ProblemReportView[]> {
+    const query = new URLSearchParams({ kind: "question" });
+    if (filter.assignmentId !== undefined) query.set("assignment_id", String(filter.assignmentId));
+    if (filter.state) query.set("state", filter.state);
     return this.request(`/api/v1/projects/${encodeURIComponent(projectKey)}/problem-reports?${query}`, { method: "GET" });
   }
 

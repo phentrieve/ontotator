@@ -10,7 +10,7 @@ New here? Start with [Your first task, start to finish](first-task.md). How to l
 - Findings: [Mark text and add a finding](#mark-text-and-add-a-finding), [Search a term](#search-a-term), [Browse the ontology tree](#browse-the-ontology-tree), [Set values and confirm defaults](#set-values-and-confirm-defaults), [Manage mentions](#manage-mentions-of-a-finding), [Add a finding without a text span](#add-a-finding-without-a-text-span), [Change term, note or delete a finding](#change-term-note-or-delete-a-finding), [Add modifiers](#add-modifiers-to-a-finding), [Undo, redo and reset](#undo-redo-and-reset-your-changes), [Turn a finding into a modifier](#turn-a-standalone-modifier-finding-into-a-modifier), [Work in several layers](#work-in-several-layers)
 - Special tasks: [Review tool proposals](#review-tool-proposals), [Review carried findings](#review-carried-findings), [Re-create findings after a text correction](#re-create-findings-after-a-text-correction)
 - Finishing: [Submit the text](#submit-the-text), [Confirm values and acknowledge warnings](#confirm-values-and-acknowledge-warnings-in-the-submit-dialog), [View your submissions](#view-your-submissions), [Start a new work round](#start-a-new-work-round)
-- Problems: [Report a text problem](#report-a-text-problem), [Resume a paused task or withdraw a report](#resume-a-paused-task-or-withdraw-a-report)
+- Problems: [Ask the lead](#ask-the-lead), [Report a text problem](#report-a-text-problem), [Resume a paused task or withdraw a report](#resume-a-paused-task-or-withdraw-a-report)
 - [Review a translation](#review-a-translation)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 
@@ -24,11 +24,21 @@ The editor has three columns:
 | --- | --- |
 | Left: **Findings** | The list of your findings. In a task from proposals: **Review Proposals** and **Your own findings**. |
 | Middle: the text | The text you annotate. Marked passages are highlighted. |
-| Right: details | The selected finding: **Values**, **Modifiers**, **Note**, its mentions and the term search. With nothing selected, the **New finding** panel opens here when you mark text. |
+| Right: details | The selected finding: **Values**, **Modifiers**, its mentions, **Note** and the term search. With nothing selected, the **New finding** panel opens here when you mark text. |
 
 The findings in the list follow the text: a finding stands where its first marked passage begins, so a finding you add in the middle of the text appears between its neighbours, not at the end. Findings without a text span come last. Carried findings stay at the top of the list, in the order of the earlier round.
 
-To make the findings list wider or narrower, drag the divider between the findings list and the text (**Resize findings column**), or focus it and press `←` or `→`. On a narrow screen, the tabs **Findings**, **Document** and **Details** switch between the columns; **Back to text** returns to the text.
+To make the findings list wider or narrower, drag the divider between the findings list and the text (**Resize findings column**), or focus it and press `←` or `→`.
+
+The right column works the same way on a wide screen (three columns): drag its left edge (**Resize details panel**), or focus it and press `←` or `→`; `Home` and `End` go to the least and the most, a double click or `Enter` restores the usual width. The round button on that edge, **Collapse details panel**, folds the column, with the ontology tree, to a narrow strip, so the text gets the room. Click the strip (**Expand details panel**) to bring it back. While the column is folded, the strip names the selected finding or proposal under *Details*. When you mark text, the column opens again by itself, for the term search. Width and folding are kept in this browser, for you.
+
+The small actions of a finding sit next to it as icons: **Show in tree** next to the term's name, **Copy text**, **Add segment** and **Move to a new finding** at each mention. Point at an icon to see its name.
+
+Some hints have a small close icon (**Hide this hint**). A hidden hint stays hidden in this browser; **More** › **Show hints again** brings all of them back.
+
+On a narrow screen, the tabs **Findings**, **Document** and **Details** switch between the columns; **Back to text** returns to the text.
+
+From a width of 1025 pixels, the toolbar of the text shares one line with the app header: **Sections**, the product name, **My tasks**, **Handbook** and your user menu (with your initials) come first, then the text's controls. The text and the tree get the height of a whole bar. In the one bar, **Next open item** is an arrow icon with that name. On a narrower screen the toolbar has its own line under the header, as before.
 
 The toolbar shows the text name, its language and the mode:
 
@@ -61,7 +71,7 @@ If the text was changed elsewhere, a **Revision conflict** notice appears; click
 | You see | Meaning |
 | --- | --- |
 | Fill colour of a mark | The term. The same term keeps one colour in the text; the colour says nothing about the state. Different terms that overlap or stand close together in a sentence always have different colours. |
-| Bands of colour | Text that belongs to several findings: one band per finding, in its colour. Up to three bands; with four or more findings the top band is striped. |
+| Bands of colour | Text that belongs to several findings: one band per finding, in its colour, stacked over the words with a thin gap between them. Up to three bands; with four or more findings the top band is striped. |
 | Solid underline | Your own finding. |
 | Dashed underline | A tool proposal under review. |
 | Dotted underline | A read-only reference finding. |
@@ -107,7 +117,7 @@ What for: record a term that the text mentions.
 1. Select the words in the text with the mouse. With the keyboard: click before the first word (or press Tab until the text has focus), hold Shift and move with the arrow keys.
 2. The panel **New finding** shows the marked text. To adjust it, drag the edge handles at its start and end, or focus a handle and press `←` or `→`.
    - On a phone, the text stays where it is and a **New finding** bar appears at the bottom of the screen. Tap **Choose term** to go on to the term search, or **Discard**. On a phone held sideways there is no bar: the panel **New finding** with the term search stands beside the text.
-3. **Search term** is already filled with the marked words, and the hits are listed under **Terms**. Change the words, or type a code such as `HP:0001250`, if the right term is not among them.
+3. **Search term** is already filled with the marked words, and the hits are listed under **Terms**. Change the words, or type a code such as `HP:0001250`, if the right term is not among them. A code with letters or dots, such as `E11.621` or `ICD10CM:E11.621`, also goes straight to its term when your project's ontology has it.
 4. Press Enter to add the top hit, or click a hit. Enter adds nothing when the top hit is a **Weak match**: click a hit, or choose it with `↓` and press Enter.
 5. The finding is created with the project's prefilled values. [Confirm or change them](#set-values-and-confirm-defaults).
 
@@ -121,11 +131,12 @@ What for: find the right ontology term quickly.
 
 1. Press `/` or click **Change term** to focus the search.
 2. Type a name or a code. Hits appear in the list **Terms**.
-3. Move with `↓` and `↑`, or point at a hit (pointing skips a **Weak match**). Below the hits, the full definition of the active hit is shown; in a narrow window, scroll down to it. Read it, then press Enter or click the hit to take it, or press Esc to cancel. Enter and a click take the hit at once.
+3. Move with `↓` and `↑`, or point at a hit (pointing skips a **Weak match**). On a phone or tablet, tap a hit to take it; a swipe that scrolls the list does not change the active hit. Below the hits, the full definition of the active hit is shown; in a narrow window, scroll down to it. Read it, then press Enter or click the hit to take it, or press Esc to cancel. Enter and a click take the hit at once.
 
 Search options:
 
 - To search only modifier terms (severity, onset, …), switch on **Modifiers only**, or type `mod:` before the word.
+- Some projects show codes without the ontology prefix, for example `N18.1` instead of `ICD10CM:N18.1` (a lead's setting, see [Show codes without the ontology prefix](lead-settings.md#show-codes-without-the-ontology-prefix)). Point at a code to see it in full.
 - The language of the text is searched too. To search names in other languages, click the language button next to the field (it lists the languages searched, for example *EN, DE*) and tick them under **Search languages**. English names are always searched.
 - Hits tagged **Modifier** are modifier terms. Use one as a finding only if it names the finding itself; otherwise add it under **Modifiers**. Obsolete terms cannot be chosen.
 - Hits tagged **Weak match** do not match your words closely: at least one word is not at the start of a word of the name, even allowing for a typo or a plural. They are listed last, and Enter takes one only after you choose it with `↓` or `↑`. If all hits are weak, the line under the field says "no close match".
@@ -136,7 +147,7 @@ The search compares the words you type with term names and synonyms, letter by l
 
 What for: pick a broader or narrower term than the one you have, or look at the neighbours of a term before you decide.
 
-1. Select a finding and click **Show in tree**. The **Ontology tree** opens at the current term.
+1. Select a finding and click **Show in tree** (the tree icon next to the term's name). The **Ontology tree** opens at the current term.
 2. Click a term in the tree. Its **Synonyms**, **Translated names** and other parents (**Also under**) are shown.
 3. Click **Use this term** to give the selected finding this term.
 4. Click **Close tree**.
@@ -145,13 +156,13 @@ What for: pick a broader or narrower term than the one you have, or look at the 
 
 | Where | **Show in tree** opens the tree at | Taking a term |
 | --- | --- | --- |
-| A proposal you have not decided yet | the proposed term | **Use this term instead…**, then **Confirm**: you get a copy with that term, as with **Edit & Replace**, and the proposal reads **Replaced**, for example *Proposal: decide as Changed with Seizure (HP:0001250)* |
+| A proposal you have not decided yet | the proposed term | **Use this term instead…**, then **Confirm**: you get a copy with that term, as with **Edit & Replace**, and the proposal reads **Replaced**; the confirmation says so, for example *Proposal: decide as Replaced with Seizure (HP:0001250)* |
 | A hit of the term search of a **New finding** (next to the definition of the highlighted hit) | that hit | **Use this term instead…**, then **Confirm**: the new finding gets the term, as if you had chosen the hit, for example *New finding: choose Seizure (HP:0001250)* |
 | A reference, other people's findings in a consolidation, a decided proposal, or your own finding in a submitted or read-only task | its term | not possible: there is no button |
 
-The confirmation names what happens; **Cancel** or `Esc` closes it and changes nothing. Nothing changes until you click **Confirm**.
+The confirmation names what happens; **Cancel** or `Esc` closes it and changes nothing. Nothing changes until you click **Confirm**. On a proposal, the confirmed term is one change: one **Undo** takes back the copy and its term, and the proposal is open again.
 
-In a wide window the tree sits under the annotation panel. To give the tree more or less room, drag the divider between the two (**Resize ontology tree**) up or down, or focus it and press `↑` or `↓`. A double click or `Enter` restores the usual split. The height is kept in this browser.
+In a wide window the tree sits under the annotation panel. To give the tree more or less room, drag the divider between the two (**Resize ontology tree**) up or down, or focus it and press `↑` or `↓`. A double click or `Enter` restores the usual split. The height is kept in this browser. Opened from a hit of the term search, the tree leaves the panel enough room for the search field and the first hits (at 1280 × 720 it is a little lower than otherwise), and the panel scrolls to that hit if it is further down.
 
 In a low window (for example 1280 × 600) the open tree takes the whole right column. The annotation panel shrinks to one line above the tree: the marked words and the term of the finding, or of the proposal or reference the tree was opened from. **Use this term** changes the term in that line too. **Show finding** brings the whole panel back above the tree, with the divider; **Hide finding** gives the tree the column again. When you close the tree, the panel is back as before.
 
@@ -186,7 +197,7 @@ What for: link a finding to every place in the text that supports it.
    - **Move to a new finding**: gives one mention its own finding with the same term and values. The new finding is selected, so you can change it right away; modifiers stay with the original finding.
    - **Remove**, then **Yes, remove**: detaches the mention.
 
-You cannot remove the last mention when the project requires a text span. If the project allows findings without a span, enter a reason in the note first.
+You cannot remove the last mention when the project requires a text span. If the project allows findings without a span, enter a reason in the note first. In a submitted or read-only task nothing can be changed: the greyed-out buttons say so when you point at them, the values show the chosen one on a grey band without the colour of a choice, and the note is shown on a grey band, not as a field to type in. On a copy made by **Edit & Replace**, **Back to the proposal** takes you back to the proposal.
 
 ## Add a finding without a text span
 
@@ -220,7 +231,7 @@ If a term has become obsolete, the panel says so. Change the term or delete the 
 What for: add severity, onset, pattern and similar details to a finding.
 
 1. Select the finding. In **Modifiers**, click **+ Add modifier…**, type into **Search modifier** and choose the modifier.
-2. Optional: to link the modifier to the words that state it, click **Link a text span** and mark the text.
+2. Optional: to link the modifier to the words that state it, click **Link a text span** and mark the text. The span is linked as soon as you let go of the mouse (with the keyboard: of `Shift`); you do not need to press Enter. Esc or **Cancel** stops without a change.
 
 Every modifier row names the modifier and its code, for example *Severe · HP:0012828*, followed by the linked words. The line *Modifiers:* in the findings list names the codes too, as do the text view and the consolidation.
 
@@ -234,7 +245,7 @@ If the modifier's words lie inside the finding's text span, for example "severe"
 
 You can take up the offer later. When you open a finding and one of its modifiers still lies inside its span, that modifier's row shows a small link *In span · Exclude*. Click **Exclude**, or choose **Exclude from finding's span** in the row menu: the same box opens. There is no link and no menu item when the modifier covers the whole span, would cut a word in half, or the mention has imported negation cues. A tool proposal's span is never changed: once your change makes the copy, the offer is for the copy.
 
-To change a modifier later, open its row menu: **Link a text span…**, **Remove text span**, **Exclude from finding's span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header.
+To change a modifier later, open its row menu: **Link a text span…**, **Remove text span**, **Exclude from finding's span** or **Remove modifier**. A removal can be undone with **Undo** in the message or in the header. On a modifier with a span, **Link a text span…** reads **Change text span…**. While the editor waits for the new words, the finding's own edges cannot be dragged, so the finding's span stays as it is.
 
 A tool proposal's modifiers change the same way while the proposal is open; see [Review tool proposals](#review-tool-proposals).
 
@@ -273,7 +284,7 @@ Tools make mistakes. Check every proposal as if you had marked it yourself: the 
 
 1. The list **Review Proposals** shows every proposal. Your additions are under **Your own findings**.
 2. Select a proposal, or move with `j` and `k`. The text shows where it was found. On a phone, where the details replace the text, the details show the sentence around the quoted passage, with the passage marked.
-3. Check the marked text, the term and each value. To see the broader and narrower terms of the proposed term, click **Show in tree** under it; to replace the term with one from the tree, click **Use this term instead…** and **Confirm** (see [Browse the ontology tree](#browse-the-ontology-tree)). To look the passage up elsewhere, click the copy icon (**Copy text**) next to the quoted passage in the details, or press `Ctrl+C` (`Cmd+C` on a Mac): both copy the passage of the selected proposal, as for a finding ([Mark text and add a finding](#mark-text-and-add-a-finding)). A proposal with several mentions has the copy icon at each.
+3. Check the marked text, the term and each value. To see the broader and narrower terms of the proposed term, click **Show in tree** (the tree icon) next to it; to replace the term with one from the tree, click **Use this term instead…** and **Confirm** (see [Browse the ontology tree](#browse-the-ontology-tree)). To look the passage up elsewhere, click the copy icon (**Copy text**) next to the quoted passage in the details, or press `Ctrl+C` (`Cmd+C` on a Mac): both copy the passage of the selected proposal, as for a finding ([Mark text and add a finding](#mark-text-and-add-a-finding)). A proposal with several mentions has the copy icon at each.
 4. Decide:
    - **Confirm**: the passage, term and all values are right. Values tagged **Defaulted** were not set by the tool but prefilled; Confirm accepts them as shown, so check them too.
    - **Reject**: the proposal is wrong and nothing should replace it.
@@ -306,7 +317,7 @@ If you change a finding after checking it, it needs a new check.
 
 In a task from proposals, your decisions on the proposals are carried to the new version: accepted, edited and added findings come along, and only those in a changed passage, or without a matching proposal in the new version, are marked **Check needed**. A proposal you rejected that has no counterpart in the new version is dropped. One you left **Unresolved** keeps its note.
 
-A row **Not on this text** means the finding could not be placed in this text. Select it and choose one: **Mark in text**, **Link to an existing finding**, or **Dismiss with reason…**. A finding re-created with **Mark in text** keeps the original's term, values and note.
+A row **Not on this text** means the finding could not be placed in this text. Select it and choose one: **Mark in text**, **Link to an existing finding**, or **Dismiss with reason…**. A finding re-created with **Mark in text** keeps the original's term, values and note. Both rows then read *Linked to …*, also after you reload the page; the carried finding still needs **Mark as checked**.
 
 ### See what changed since the earlier version
 
@@ -322,20 +333,22 @@ The marks are only shown over the text: the text stays exactly this version, so 
 
 ## Re-create findings after a text correction
 
-What for: move your findings to the corrected text after the text got a new version, for example from a translation review, a lead's correction or an upload, and your task moved to it. The toolbar reads **Check after text change** while findings are marked **Check needed**. This works the same in a task from proposals: only findings in changed passages need you; your other decisions on the proposals are already carried.
+What for: move your findings to the corrected text after the text got a new version, for example from a translation review, a lead's correction or an upload, and your task moved to it. The toolbar reads **Check after text change** while findings are marked **Check needed**. This works the same in a task from proposals: only findings in changed passages need you; your other decisions on the proposals are already carried. In a task from proposals that starts on the corrected text, the panel also lists the tool's proposals whose words the correction changed, even when that was every proposal; one that nobody re-created stays listed after a further correction of the text, with the words it was proposed on.
 
-1. The panel **Needs review after the text change** lists the findings to place again.
-2. For each item, click **Re-create here** and mark the supporting text in the corrected version.
-3. Check the term, then click **Save re-created finding**. You can choose a different term below.
-4. Check the text span and the values of the saved finding, then click **Complete text-change review**. A later change to the finding needs this again.
+1. The panel **Needs review after the text change** lists the findings to place again, one row each: the term, the words it was on, and its values when they differ from the defaults. Each item is also marked in the text with a dashed frame: where its words are now, or the new wording that replaced them. Point at a mark to see the term and the old words. Clicking a mark selects its row; clicking the term in a row scrolls the text there.
+2. If the words are still in the corrected text, for example in a sentence that was only reordered, the row offers **Use this location**. One click re-creates the finding there with its term and values and completes its review. If the words occur more than once nearby, **Next place** next to it, which shows the count, for example *1 of 2 ›*, moves the offer to the next one. Two findings on the same words each get the offer.
+3. Otherwise, or to use other words, click **Mark in text** and mark the supporting text in the corrected version. A row that reads *now “…”* names the new wording in place of the old words; *not found in the corrected text* means there is no reliable place, and the text only scrolls near it. Check the term, then click **Save re-created finding**. You can choose a different term below.
+4. After each item the next one is selected, in the panel and in the text, and its first action has the focus. Press `N` to move to the next item yourself, `Shift + N` to go back.
 
-If the finding no longer fits, click **Dismiss with reason**, fill in **Reason for dismissal** and click **Save dismissal**.
+Saving completes the review of the item. Values the tool defaulted stay marked **Defaults to confirm**, as on any finding. Only where the project requires chosen values does the saved finding open first: confirm or change its values, then click **Complete text-change review**. A later change to a re-created finding needs **Complete text-change review** again.
+
+If the finding no longer fits, click **Dismiss…**, fill in **Reason for dismissal** and click **Save dismissal**. **Show text change** in a row shows the reason, the original and the current context, and the changes between them. The current context marks the place the row offers, or the new wording; the changes are compared around those words, so a reordered sentence does not pair unrelated words.
 
 To see which passages the correction changed, tick **Show changes since** v1 above the text ([See what changed since the earlier version](#see-what-changed-since-the-earlier-version)).
 
 ### After a typo fix by the lead
 
-When the lead fixes only spacing or a typo in a text you already submitted (**Fix typos…**), your annotation can move to the new version by itself: when every one of your findings is placed on the new text without doubt and no number in the text changed. You do nothing. In **My tasks** the text then shows its new version, for example *case-0465 de v2 corrected*, as **Submitted**, with the day you were assigned; the task on the old version is gone. **View** shows the corrected text with your findings, placed on it, and the round reads *Round 1, moved to v2 after a typo fix*; your findings are not shown as carried findings to check, as you checked nothing. **Show changes since** v1 shows what the lead changed. It is still your annotation: nothing was added or removed. If a finding marked words the lead changed, or a number changed, your annotation stays on the old version and the lead moves it the usual way; you then check the carried findings ([Review carried findings](#review-carried-findings)).
+When the lead fixes only spacing or a typo in a text you already submitted (a typo fix, without a review), your annotation can move to the new version by itself: when every one of your findings is placed on the new text without doubt and no number in the text changed. You do nothing. In **My tasks** the text then shows its new version, for example *case-0465 de v2 corrected*, as **Submitted**, with the day you were assigned; the task on the old version is gone. The task keeps the time you submitted, in its *Submitted* status and in **My submissions**. **View** shows the corrected text with your findings, placed on it, and the round reads *Round 1, moved to v2 after a typo fix*; your findings are not shown as carried findings to check, as you checked nothing. **Show changes since** v1 shows what the lead changed. It is still your annotation: nothing was added or removed. If a finding marked words the lead changed, or a number changed, your annotation stays on the old version and the lead moves it the usual way; you then check the carried findings ([Review carried findings](#review-carried-findings)).
 
 ## Submit the text
 
@@ -396,9 +409,25 @@ What happens to your earlier work:
 - While your submission is being consolidated, you cannot continue from it. The dialog then shows no choice and no button under **Start a new round**, only: *Your submission is being consolidated, so you cannot continue from it now. Ask your project lead.* The lead can finish the consolidation or withdraw it; after that the dialog offers your submission again.
 - In a task from tool proposals you cannot continue from a submission yourself. The dialog says: *In a task from tool proposals you cannot continue from a submission yourself. Ask your project lead to start a new round.*
 
+## Ask the lead
+
+What for: ask the project lead a question about the task you are working on, for example whether a translated term is right. Today this is offered in a translation review. Your task stays open: you keep working and decide yourself once the lead answers.
+
+1. Optional: select the passage you ask about in the translation.
+2. Click **Ask the lead…** in the header, or **Ask the lead…** under **Questions to the lead** in **Your review**.
+3. Write **Your question**. **Passage you ask about (optional)** holds the passage you selected. In **Your wording for this passage (optional)**, write how you would put it; the lead can take it into your text with the answer.
+4. Optional: tick **Pause my task until the lead answers** if you cannot go on without the answer.
+5. Click **Send question**.
+
+With **Pause my task until the lead answers** ticked, your task is paused as soon as you send; your edits are saved first. The banner reads *Paused until the lead answers your question* followed by your question (up to three lines on a phone; **Show more** shows the rest). The lead's answer opens your task again, also while you stay in it: as soon as your bell shows the answer (within about a minute). To go on without waiting, click **Resume my task…** on the question under **Questions to the lead**, write **Why can you continue?** and click **Resume my task**: the question stays open and the lead can still answer it. A question is not a text problem: **Report a text problem** does not count it.
+
+**Questions to the lead** lists your questions: *Waiting for the lead's answer*, then *Answered by the lead* with **Answer from the lead**. The notice *Question sent. …* above the list goes once the lead has answered. If the lead took your wording, it reads *The lead put your wording into your text.*; click **Show it in my text** to select it in your text. Check it and submit your review as usual. If you had changed that passage meanwhile, so that your text was kept (see below), it reads *The lead chose your wording. It is not in your text now: you changed that passage.*, and **Show the lead's wording** shows the notice with the wording again.
+
+You can keep typing while the lead answers: nothing you type is lost. When the review is open, the wording comes into your text as soon as your screen learns of the answer (when you come back to the window, when your bell shows the answer, within 15 seconds, or with your next save), and your other edits stay. A notice says *The lead's wording is in your text now: …*. If you changed the passage yourself meanwhile, your text wins: the notice *Your text was kept* names the lead's wording, and **Use the lead's wording** puts it in place of your version with one click. The line above the button names the version it replaces, for example *Replaces “low muscle tone” in your text.*; a rewrite into several words is replaced as a whole. If the review was changed elsewhere in another way, for example in a second window, the status reads **Conflict** and you choose: **Keep my text** saves your text over the other change, **Load the saved review…** discards your edits here.
+
 ## Report a text problem
 
-What for: tell the lead that the text cannot be annotated as it is, for example cut off or the wrong text. For questions about the rules, ask your lead directly instead. For an error message, a crash or something that does not load, use [Report a technical problem](getting-started.md#report-a-technical-problem): it goes to the administrators and does not pause your task.
+What for: tell the lead that the text cannot be annotated as it is, for example cut off or the wrong text. For a question about the translation, use [Ask the lead](#ask-the-lead): it does not pause your task. For questions about the rules, ask your lead directly instead. For an error message, a crash or something that does not load, use [Report a technical problem](getting-started.md#report-a-technical-problem): it goes to the administrators and does not pause your task.
 
 Before you start: a report pauses your task. You cannot save or submit until the pause is released. Your saved work stays.
 
@@ -454,32 +483,33 @@ Then decide:
 | --- | --- | --- |
 | **Accepted unchanged** | The translation is right as it stands. | It becomes available for annotation. Annotation tasks already assigned open by themselves. |
 | **Accepted with corrections** | You corrected it and it is now right. Editing chooses this for you. | Your corrected text is saved as a new text version, which is accepted for annotation. |
-| **Query** | The meaning may differ clinically and you are not sure. | Not accepted. The lead reads your rationale and decides: they take the text you proposed, or accept the translation as it is, and answer you. Annotation tasks already assigned keep waiting until then. |
 | **Rejected** | The translation changes the clinical meaning. | Not accepted. The lead decides: a new review, a correction or discarding it. Annotation tasks already assigned keep waiting. |
 
-A problem in the source that does not affect the translation is no reason for a **Query**. Examples: a dose that looks too low but is what the source says, a footnote digit stuck to a year, a word broken by a hyphen at a line end. If the translation gives the source correctly, accept it (**Accepted unchanged**, or **Accepted with corrections** if you corrected something else) and put your remark in the **Rationale**. It is kept with your review. The lead reads the **Rationale** of every review, also of an accepted one, under **Translation reviews** in the text card and in the list of all translation reviews. A **Query** holds the annotation of the text until the lead decides; keep it for a translation you are not sure about.
+Not sure? Use [Ask the lead](#ask-the-lead) before you decide; your review stays open. **Query** is no longer a decision. Reviews submitted as **Query** before stay readable, with the lead's decision.
+
+A problem in the source that does not affect the translation needs no question. Examples: a dose that looks too low but is what the source says, a footnote digit stuck to a year, a word broken by a hyphen at a line end. If the translation gives the source correctly, accept it (**Accepted unchanged**, or **Accepted with corrections** if you corrected something else) and put your remark in the **Rationale**. It is kept with your review. The lead reads the **Rationale** of every review, also of an accepted one, under **Translation reviews** in the text card and in the list of all translation reviews.
 
 Steps:
 
 1. Open the task. The **Source** is on the left, the **Translation** on the right.
 2. Read the automatic checks band at the top. Click **Details** to see which checks failed and why.
-   - The band may also read *More passages in brackets than in the source: 2 in the translation, 1 in the source*. Ontotator found this itself, on the version you review. A translation sometimes adds a second name in brackets, for example a lay term followed by the Latin or English term; one finding is then named twice. **Details** lists the passages. If the translation added one, remove it; your decision is then **Accepted with corrections**. If you are not sure, choose **Query** with the category **Addition**. If the passages are right, decide as usual: this check asks for no rationale and is not counted in **My tasks**.
+   - The band may also read *More passages in brackets than in the source: 2 in the translation, 1 in the source*. Ontotator found this itself, on the version you review. A translation sometimes adds a second name in brackets, for example a lay term followed by the Latin or English term; one finding is then named twice. **Details** lists the passages. If the translation added one, remove it; your decision is then **Accepted with corrections**. If you are not sure, [ask the lead](#ask-the-lead). If the passages are right, decide as usual: this check asks for no rationale and is not counted in **My tasks**.
 3. Type your corrections directly in the translation column. Your edits are saved as you type, and the decision switches to **Accepted with corrections**. Use **Show changes** to see your edits, also a double space you typed, and **Couple scrolling** to scroll both columns together. **Show matching paragraph** (`Alt+M`) jumps to the paired paragraph.
 4. Optional: to compare with another text, click **Compare** above the texts. With several texts to compare, it opens a menu. In the review of a later version (v2, v3, …), the first entry is the previous version ([Review a later version](#review-a-later-version)).
-5. Under **Your review**, choose a **Decision** (or press `1` to `4`).
+5. Under **Your review**, choose a **Decision** (or press `1` to `3`).
 6. Fill in what the decision needs:
-   - **Query** and **Rejected** always count as a clinically relevant change: choose at least one category and write a **Rationale**. Put your question for the lead in the rationale.
+   - **Rejected** always counts as a clinically relevant change: choose at least one category and write a **Rationale**.
    - **Accepted with corrections**: tick **Clinically relevant change** if your correction changes the clinical meaning; then a category and a **Rationale** are required.
    - **Accepted unchanged** after a failed automatic check: say in the **Rationale** why the flagged difference is correct.
 7. Click **Submit review…** (or press `Ctrl+Enter`), read what will happen, then click **Submit review**.
    - If the text has spacing errors or invisible characters, the confirmation says so, for example *2 typography hints in your text: double space (2).* Click **Show them** to see each place with a little text around it; spaces are drawn as dots. To fix them, click **Keep editing**. The line blocks nothing: you can submit all the same. It names a double space, a space before or a missing space after punctuation, spaces at the end of a line or of the text, tabs, invisible characters and a doubled full stop. It does not find two words run together or a grammar slip; read your corrections once more.
-8. A message confirms the review, with **View result**. Your next open task opens on its own, another translation review first, or **My tasks** if none is left. If you also annotate this text and your review finished its translation, your annotation of the text opens instead and the message adds *Annotate this text now*. Finished means: the translation is accepted (with corrections, on the corrected version), every other translation of the text is accepted too, and no further review or decision of the lead is pending. After **Query** or **Rejected** it does not come first.
+8. A message confirms the review, with **View result**. Your next open task opens on its own, another translation review first, or **My tasks** if none is left. If you also annotate this text and your review finished its translation, your annotation of the text opens instead and the message adds *Annotate this text now*. Finished means: the translation is accepted (with corrections, on the corrected version), every other translation of the text is accepted too, and no further review or decision of the lead is pending. After **Rejected** it does not come first.
 
 On a wide screen, **Your review** is a column on the right. To give the texts more room, drag its left edge (**Resize review panel**), or focus the edge and press `←` or `→`; `Enter` restores the default width. **Collapse review panel** folds it to a narrow strip: the bar at the bottom then shows the decision and **Submit review…**, and **Expand review panel** or **Change ↓** opens it again. Width and folding are remembered in this browser.
 
 In **My tasks** a submitted review names your decision under **Submitted**, for example *Your decision: Rejected*. When you open it, **Submitted review** lists the decision and **Status after this review**: *Accepted* after **Accepted unchanged**, *Reviewed; the corrected text was accepted as the next version* after **Accepted with corrections**, and *Reviewed, not accepted* after **Rejected** or **Query**. That is the status your review gave the version, not necessarily its status today: the lead may have decided since.
 
-After a **Query** the lead decides. **My tasks** then shows *Answer from the lead* at your submitted review (tab **Submitted**). Open the task: above **Submitted review** you read what was decided, for example *The lead decided your query on 18 Nov, 10:12. Your text was accepted as v2.* (or *v1 was accepted as it is.*), and the lead's answer, for example *Answer from the lead: Yes, as proposed.*
+A review submitted as **Query** before this change is decided by the lead. **My tasks** then shows *Answer from the lead* at your submitted review (tab **Submitted**). Open the task: above **Submitted review** you read what was decided, for example *The lead decided your query on 18 Nov, 10:12. Your text was accepted as v2.* (or *v1 was accepted as it is.*), and the lead's answer, for example *Answer from the lead: Yes, as proposed.*
 
 A project lead who corrects a translation themselves sees only **Accepted with corrections**. When the lead corrects a translation that was already accepted, the corrected version is reviewed again: it then appears as a new translation review task, usually for you ([Correct a translation yourself](lead-results.md#correct-a-translation-yourself)).
 
@@ -499,7 +529,7 @@ What for: review a translation that already has an earlier version, for example 
 
 The task shows the version you were given, not the first one:
 
-- **Translation details** says how this version was made: **This version** (for example *Human translation*, *Machine translation, DeepL, deepl-2026-10*, *Corrected by hand*, *Corrected by the project lead*, *Corrected in a translation review* or, after **Fix typos…**, *Typos fixed by the project lead on 17 Nov, 10:12* with **What was fixed**), when it was uploaded or corrected, the **Version before** and, for an uploaded text, what the lead recorded about who made it and when. The machine translation run of the first version is listed separately, for example *Translation run of v1*. On a phone the details open below the bar across the width of the screen.
+- **Translation details** says how this version was made: **This version** (for example *Human translation*, *Machine translation, DeepL, deepl-2026-10*, *Corrected by hand*, *Corrected by the project lead*, *Corrected in a translation review* or, after a typo fix, *Typos fixed by the project lead on 17 Nov, 10:12* with **What was fixed**), when it was uploaded or corrected, the **Version before** and, for an uploaded text, what the lead recorded about who made it and when. The machine translation run of the first version is listed separately, for example *Translation run of v1*. On a phone the details open below the bar across the width of the screen.
 - The line under the translation reads *Same as the version you were given (v2).* Your own edits are underlined against that version, and **Show changes** shows them.
 - **Compare** shows what changed since the version before. Click **Compare** (with several texts to compare, choose *The previous version (v1)*): the third column, *Changes from v1 to v2*, shows this version with the removed passages struck through and the added ones underlined. **Close** hides it again.
 - The automatic checks ran on the first version only. The band says so, for example *The automatic checks ran on v1, not on this version (v2). 1 automatic check failed on v1: Units added in translation.* **Details** lists the checks of v1. A check that failed on v1 is not counted in **My tasks** for this task, and **Accepted unchanged** needs no rationale because of it. Check yourself whether the passage is right in this version. Only the check for passages in brackets is made on this version itself.
@@ -515,19 +545,22 @@ If the source text was updated after the translation was made, **Source updates 
 
 **Submit review…** alone does not resolve a source update. If you use it with an accepting decision while one is open, the confirmation says so, for example *1 source update is not reviewed.*, and offers **Review source update**, which opens the comparison. **Submit without the source update** accepts the translation against the original source and leaves the update open: the submitted review can then no longer resolve it, and the lead has to assign another review.
 
-![A translation review: the source on the left, the translation on the right, the failed automatic check above them. On the right, Query is chosen with the category Number or unit and a rationale, above Submit review…](images/annotator-translation-review.png)
+![A translation review: the source on the left, the translation on the right, the failed automatic check above them. On the right, Rejected is chosen with the category Number or unit and a rationale, above Submit review…](images/annotator-translation-review.png)
 
 ### Mark checked sentences
 
 What for: keep track of the sentences you have already checked in a long text.
 
-1. Tick **Mark checked sentences** above the texts. Both texts are now split into sentences. To edit the translation again, untick it. **Show changes** is off while you mark. Your choice is remembered in this browser.
+1. Tick **Mark checked sentences** above the texts. Both texts are now split into sentences. To edit the translation again, untick it. Your choice is remembered in this browser.
 2. Click a sentence to mark it as checked. Click it again to remove the mark. Source and translation are marked separately.
 3. Shift+click a sentence to mark all sentences from the last one you clicked up to this one.
-4. Or press on a sentence and drag across others. Starting on an unmarked sentence marks all of them. Starting on a marked sentence removes the marks.
-5. The head of each text shows how many of its sentences are checked. **Next unchecked** jumps to the first unchecked sentence of the translation.
+4. The head of each text shows how many of its sentences are checked. **Next unchecked** jumps to the first unchecked sentence of the translation.
 
 Checked sentences are green. If you edit a checked sentence later, it turns amber, and the head of the text counts it as *changed*. Read it again, then click it to mark it as checked.
+
+To see what you changed while you mark, also tick **Show changes**. The translation keeps its sentences and marks, and your changes stand in them as in **Show changes** alone: added words underlined in green, removed words struck through in red. To edit again, untick both.
+
+The text stays selectable while you mark. Drag over it to select words, for example to copy them; a drag marks nothing. A double-click selects a word and leaves its sentence's mark as it was. The browser's find (`Ctrl+F` or `Cmd+F`) finds and highlights words in both texts and steps through all of them; with **Show changes** on, it finds the changed text, not the removed words.
 
 A mark belongs to its sentence, not to its wording. When a text repeats a sentence, for example *Unauffällig.*, and you edit the one you had checked, that sentence turns amber where it stands; the same sentence elsewhere in the text stays as it was, unchecked if you had not checked it. When you add or remove text before checked sentences, their marks move with them. A checked sentence you delete loses its mark; if you take an edit back, the sentence is green again.
 

@@ -26,11 +26,14 @@ from ontotator.domain.reanchor import (
     MappedModifier,
     NeedsReview,
     OldModifier,
+    Relocation,
     Span,
     TextMap,
     TextSpan,
+    TextWindow,
     map_span,
     reanchor_annotation,
+    relocate,
     text_map,
 )
 
@@ -518,3 +521,161 @@ def test_modifier_segments_of_a_document_level_finding_are_checked():
     )
     assert isinstance(result, NeedsReview)
     assert result.reason == "source_text_mismatch"
+
+
+# The example of #633: a correction rewords one finding and reorders a sentence.
+REORDER_V1 = (
+    "History: two febrile seizures in infancy. Examination showed hypotonia and"
+    " mild ptosis.\n\nPhysiotherapy was started after ataxia was noted. Ataxia"
+    " improved within weeks.\nFamily history is unremarkable."
+)
+REORDER_V2 = (
+    "History: two febrile seizures in infancy. Examination showed hypotonia and"
+    " a slightly drooping eyelid.\n\nAfter ataxia was noted, physiotherapy was"
+    " started. Ataxia improved within weeks.\nFamily history is unremarkable."
+)
+
+
+def _relocated(word):
+    start = REORDER_V1.index(word)
+    review = run(REORDER_V1, REORDER_V2, (((start, start + len(word)),),))
+    assert isinstance(review, NeedsReview)
+    return relocate(
+        review.old_mentions[0].segments,
+        review.old_context,
+        review.new_context,
+        REORDER_V2,
+    )
+
+
+def test_an_unchanged_phrase_in_a_reordered_sentence_gets_a_suggested_location():
+    start = REORDER_V1.index("ataxia")
+    m = text_map(REORDER_V1, REORDER_V2)
+    assert map_span(m, start, start + len("ataxia")) is None
+    found = _relocated("ataxia")
+    at = REORDER_V2.index("ataxia")
+    assert found.suggestions == ((TextSpan(at, at + 6, "ataxia"),),)
+    assert found.changed_at is None
+    # The context is anchored where the words are, not at the end of the block.
+    assert found.new_context is not None
+    assert found.new_context.start <= at < at + 6 <= found.new_context.end
+    assert (
+        found.new_context.text
+        == REORDER_V2[found.new_context.start : found.new_context.end]
+    )
+    old_text = "".join(op.old_text for op in found.diff if op.op != "insert")
+    new_text = "".join(op.new_text for op in found.diff if op.op != "delete")
+    assert new_text == found.new_context.text
+    assert old_text == REORDER_V1[found.diff[0].old_start : found.diff[-1].old_end]
+
+
+def test_a_phrase_that_is_gone_gets_no_suggestion_but_its_new_wording():
+    found = _relocated("ptosis")
+    assert found.suggestions == ()
+    at = REORDER_V2.index("a slightly drooping eyelid")
+    assert found.changed_at == TextSpan(
+        at, at + len("a slightly drooping eyelid"), "a slightly drooping eyelid"
+    )
+
+
+def test_a_suggestion_matches_whole_words_and_lists_every_near_place():
+    old = "Patient has ataxia. Seen today."
+    new = "Seen today, ataxias and ataxia. Patient has ataxia."
+    start = old.index("ataxia")
+    found = relocate(
+        [TextSpan(start, start + 6, "ataxia")],
+        TextWindow(0, len(old), old),
+        TextWindow(0, len(new), new),
+        new,
+    )
+    places = sorted(place[0].start for place in found.suggestions)
+    assert places == [new.index("ataxia."), new.rindex("ataxia")]
+
+
+def test_no_reliable_location_gives_no_context():
+    old = "Ataxia was noted."
+    new = "Nothing of the kind."
+    review = run(old, new, (((0, 6),),))
+    assert isinstance(review, NeedsReview)
+    found = relocate(
+        review.old_mentions[0].segments, review.old_context, review.new_context, new
+    )
+    assert found == Relocation((), None, None, ())
+
+
+def test_the_new_wording_keeps_the_unchanged_words_of_a_partly_changed_mention():
+    old = "Before it. Seizure 😀old at night. After it."
+    new = "Before it. Ataxia 😀new at night. After it."
+    start = old.index("Seizure")
+    review = run(old, new, (((start, start + len("Seizure 😀old")),),))
+    assert isinstance(review, NeedsReview)
+    found = relocate(
+        review.old_mentions[0].segments, review.old_context, review.new_context, new
+    )
+    at = new.index("Ataxia")
+    assert found.suggestions == ()
+    assert found.changed_at == TextSpan(at, at + len("Ataxia 😀new"), "Ataxia 😀new")
+
+
+def test_a_place_that_is_another_old_occurrence_unchanged_comes_last():
+    # Issue 649: the reordered sentence moves the first "Areflexie"; the second
+    # stays where it was. Place 1 is the moved one, not the other occurrence.
+    old = (
+        "Befund: zeigte eine Hypotonie.\n\n"
+        "Die Physiotherapie wurde begonnen, nachdem eine Areflexie bemerkt wurde."
+        " Die Areflexie besserte sich innerhalb von Wochen."
+    )
+    new = (
+        "Befund: zeigte eine Hypotonie.\n\n"
+        "Als eine Areflexie auffiel, wurde die Physiotherapie begonnen."
+        " Die Areflexie besserte sich innerhalb von Wochen."
+    )
+    start = old.index("Areflexie")
+    review = run(old, new, (((start, start + len("Areflexie")),),))
+    assert isinstance(review, NeedsReview)
+    found = relocate(
+        review.old_mentions[0].segments, review.old_context, review.new_context, new
+    )
+    moved, other = new.index("Areflexie"), new.rindex("Areflexie")
+    assert [place[0].start for place in found.suggestions] == [moved, other]
+    assert found.new_context is not None
+    assert found.new_context.start <= moved < found.new_context.end
+
+
+# Issue 652: the correction deletes "und eine leichte Schwerhörigkeit" and
+# reorders the next sentence; "eine" also stands before the reordered clause.
+DELETED_V1 = (
+    "Befund: zeigte eine Hypotonie und eine leichte Schwerhörigkeit.\n\n"
+    "Die Physiotherapie wurde begonnen, nachdem eine Areflexie bemerkt wurde."
+    " Die Areflexie besserte sich innerhalb von Wochen."
+)
+
+
+def _relocated_in(old, new, word):
+    start = old.index(word)
+    review = run(old, new, (((start, start + len(word)),),))
+    assert isinstance(review, NeedsReview)
+    return relocate(
+        review.old_mentions[0].segments, review.old_context, review.new_context, new
+    )
+
+
+def test_a_deleted_phrase_next_to_a_reordered_clause_is_not_found():
+    new = (
+        "Befund: zeigte eine Hypotonie.\n\n"
+        "Als eine Areflexie auffiel, wurde die Physiotherapie begonnen."
+        " Die Areflexie besserte sich innerhalb von Wochen."
+    )
+    found = _relocated_in(DELETED_V1, new, "Schwerhörigkeit")
+    assert found == Relocation((), None, None, ())
+
+
+def test_a_one_word_replacement_next_to_a_reordered_clause_gets_its_new_wording():
+    new = (
+        "Befund: zeigte eine Hypotonie und eine leichte Hörminderung.\n\n"
+        "Als eine Areflexie auffiel, wurde die Physiotherapie begonnen."
+        " Die Areflexie besserte sich innerhalb von Wochen."
+    )
+    found = _relocated_in(DELETED_V1, new, "Schwerhörigkeit")
+    at = new.index("Hörminderung")
+    assert found.changed_at == TextSpan(at, at + len("Hörminderung"), "Hörminderung")

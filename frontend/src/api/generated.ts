@@ -821,6 +821,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notifications
+         * @description The caller's newest notifications and the number of unread ones.
+         */
+        get: operations["list_notifications_api_v1_me_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/notifications/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Notification Summary
+         * @description The number of unread notifications (the bell's count).
+         */
+        get: operations["notification_summary_api_v1_me_notifications_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/notifications/{notification_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Notification Read
+         * @description Mark one notification read; another person's id changes nothing.
+         */
+        post: operations["mark_notification_read_api_v1_me_notifications__notification_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark All Notifications Read
+         * @description Mark every notification read, up to ``up_to`` when given.
+         */
+        post: operations["mark_all_notifications_read_api_v1_me_notifications_read_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/translation-reviews/{assignment_id}": {
         parameters: {
             query?: never;
@@ -3990,6 +4070,10 @@ export interface components {
         /**
          * ActiveHoldView
          * @description An active pause on the owner's task; other people's reports stay unnamed.
+         *
+         *     ``kind`` says what paused it: a problem report, or a question to the lead
+         *     whose asker chose to pause (issue 553). Only the answer, or the asker's
+         *     own resume, releases the pause of a question.
          */
         ActiveHoldView: {
             /** Reason */
@@ -4001,6 +4085,12 @@ export interface components {
             created_at: string;
             /** Own Report Id */
             own_report_id: string | null;
+            /**
+             * Kind
+             * @default problem
+             * @enum {string}
+             */
+            kind: "problem" | "question";
         };
         /**
          * ActorRef
@@ -8010,6 +8100,8 @@ export interface components {
             available: boolean;
             /** Reason */
             reason: string | null;
+            /** Missing Languages */
+            missing_languages: string[];
             /** Reviewed Again */
             reviewed_again: boolean;
             /** Review On */
@@ -8054,6 +8146,11 @@ export interface components {
             username: string;
             /** Password */
             password: string;
+        };
+        /** MarkAllReadRequest */
+        MarkAllReadRequest: {
+            /** Up To */
+            up_to?: number | null;
         };
         /**
          * Member
@@ -8384,6 +8481,58 @@ export interface components {
             document_id?: string | null;
             /** Blocked */
             blocked?: "no_target_proposals" | null;
+        };
+        /** NotificationList */
+        NotificationList: {
+            /** Unread */
+            unread: number;
+            /** Items */
+            items: components["schemas"]["NotificationView"][];
+        };
+        /**
+         * NotificationSummary
+         * @description The bell's count.
+         */
+        NotificationSummary: {
+            /** Unread */
+            unread: number;
+        };
+        /**
+         * NotificationView
+         * @description One entry of the bell's list. The app words it from these fields.
+         */
+        NotificationView: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "task_assigned" | "task_reopened" | "task_released" | "text_problem_received" | "question_received" | "answer_received" | "submission_waiting";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Read */
+            read: boolean;
+            /** Project Key */
+            project_key: string;
+            /** Project Name */
+            project_name: string;
+            actor: components["schemas"]["PersonRefView"] | null;
+            /** Assignment Id */
+            assignment_id: number | null;
+            /** Task */
+            task: ("annotate" | "review" | "translation_review") | null;
+            /** Case Id */
+            case_id: string | null;
+            /** Language */
+            language: string | null;
+            /** Version */
+            version: number | null;
+            /** Target Id */
+            target_id: string | null;
         };
         /** OldMentionView */
         OldMentionView: {
@@ -9150,11 +9299,16 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "resume" | "resolve" | "extend_hold" | "restart" | "withdraw" | "reopen";
+            action: "resume" | "resolve" | "extend_hold" | "restart" | "withdraw" | "reopen" | "answer";
             /** Reason */
             reason: string;
             /** Assignment Ids */
             assignment_ids?: number[];
+            /**
+             * Take Proposed Text
+             * @default false
+             */
+            take_proposed_text: boolean;
         };
         /** ProblemReportRequest */
         ProblemReportRequest: {
@@ -9168,6 +9322,18 @@ export interface components {
             submission_id?: string | null;
             /** Reason */
             reason: string;
+            /**
+             * Kind
+             * @default problem
+             * @enum {string}
+             */
+            kind: "problem" | "question";
+            /** Quote */
+            quote?: string | null;
+            /** Proposed Text */
+            proposed_text?: string | null;
+            /** Pause */
+            pause?: boolean | null;
         };
         /** ProblemReportView */
         ProblemReportView: {
@@ -9257,6 +9423,31 @@ export interface components {
             answered: boolean;
             /** Text Paused By Lead */
             text_paused_by_lead?: boolean;
+            /**
+             * Kind
+             * @default problem
+             * @enum {string}
+             */
+            kind: "problem" | "question";
+            /** Quote */
+            quote?: string | null;
+            /** Proposed Text */
+            proposed_text?: string | null;
+            /**
+             * Pauses
+             * @default true
+             */
+            pauses: boolean;
+            /** Answer */
+            answer?: string | null;
+            /** Answered At */
+            answered_at?: string | null;
+            answered_by?: components["schemas"]["PersonRefView"] | null;
+            /**
+             * Took Proposed Text
+             * @default false
+             */
+            took_proposed_text: boolean;
         };
         /** Profile */
         Profile: {
@@ -9698,6 +9889,12 @@ export interface components {
             annotate_accepted_translations_only: boolean;
             /** Record Working Time */
             record_working_time?: boolean;
+            /** Hide Term Id Prefix */
+            hide_term_id_prefix?: boolean;
+            /** Term Link Templates */
+            term_link_templates?: {
+                [key: string]: string;
+            };
             /** Hidden Axis Values */
             hidden_axis_values?: {
                 [key: string]: {
@@ -9798,6 +9995,12 @@ export interface components {
             annotate_accepted_translations_only: boolean;
             /** Record Working Time */
             record_working_time?: boolean;
+            /** Hide Term Id Prefix */
+            hide_term_id_prefix?: boolean;
+            /** Term Link Templates */
+            term_link_templates?: {
+                [key: string]: string;
+            };
             /** Hidden Axis Values */
             hidden_axis_values?: {
                 [key: string]: {
@@ -10128,6 +10331,9 @@ export interface components {
             new_context: components["schemas"]["TextWindowView"];
             /** Diff */
             diff: components["schemas"]["WindowOpcodeView"][];
+            /** Suggestions */
+            suggestions?: components["schemas"]["TextWindowView"][][];
+            changed_at?: components["schemas"]["TextWindowView"] | null;
             /** Old Segments */
             readonly old_segments: components["schemas"]["TextWindowView"][];
         };
@@ -10284,6 +10490,11 @@ export interface components {
              * @default false
              */
             own_task: boolean;
+            /**
+             * Took Proposed Text
+             * @default false
+             */
+            took_proposed_text: boolean;
         };
         /** ReportHoldView */
         ReportHoldView: {
@@ -13037,6 +13248,11 @@ export interface components {
              * @enum {string}
              */
             status: "open" | "in_progress" | "submitted" | "reopened";
+            /**
+             * Opened
+             * @default false
+             */
+            opened: boolean;
             /** Held */
             held: boolean;
             /** Pause Causes */
@@ -13286,6 +13502,8 @@ export interface components {
             axes_config_sha256: string;
             /** Modifier Layer Ids */
             modifier_layer_ids?: string[];
+            /** Hide Term Id Prefix */
+            hide_term_id_prefix?: boolean;
         };
     };
     responses: never;
@@ -14513,6 +14731,8 @@ export interface operations {
                 assignment_id?: number | null;
                 limit?: number;
                 offset?: number;
+                kind?: "problem" | "question";
+                state?: ("open" | "resolved" | "withdrawn") | null;
             };
             header?: never;
             path: {
@@ -14810,6 +15030,121 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TechnicalReportView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notifications_api_v1_me_notifications_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    notification_summary_api_v1_me_notifications_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationSummary"];
+                };
+            };
+        };
+    };
+    mark_notification_read_api_v1_me_notifications__notification_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notification_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_all_notifications_read_api_v1_me_notifications_read_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkAllReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationSummary"];
                 };
             };
             /** @description Validation Error */

@@ -29,6 +29,7 @@ import { useConsolidation, type AxisWarning } from "./useConsolidation";
 import "./consolidation.css";
 import { LanguageText } from "../ui/LanguageTag";
 import { onSpaceActivate } from "../ui/spaceActivates";
+import { shortTermId, TermIdsProvider } from "../editor/termIds";
 
 export interface ConsolidationScreenProps {
   projectKey: string;
@@ -113,6 +114,8 @@ const nextOpenAfter = (groups: readonly ConsolidationGroupView[], groupId: strin
 export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Element {
   const data = useConsolidation(props.roundId, { workspaceView: props.workspaceView, onTaskHeld: props.onTaskHeld });
   const view = data.view;
+  // The project setting "Show codes without the ontology prefix" (termIds.tsx).
+  const shownOntologyIds = data.workspace?.hide_term_id_prefix ? (data.workspace.ontologies ?? []).map(item => item.ontology_id) : [];
   const wide = useMediaQuery("(min-width: 1100px)");
   const medium = useMediaQuery("(min-width: 700px)");
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
@@ -296,7 +299,7 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
     setAdding(false); changed();
     const ok = await data.addFinding({ ...addTarget, annotationId: newAnnotationId, termId: candidate.term_id, searchId, segments: [range], axes: addTarget.axes });
     // The new finding has the creation defaults; its values open for a check right away.
-    if (ok) { setRange(null); setEditAdded(newAnnotationId); setNewAnnotationId(`ann-${randomId()}`); show({ message: `Finding added: ${candidate.label} (${candidate.term_id}). Check its values.` }); }
+    if (ok) { setRange(null); setEditAdded(newAnnotationId); setNewAnnotationId(`ann-${randomId()}`); show({ message: `Finding added: ${candidate.label} (${shortTermId(candidate.term_id, shownOntologyIds)}). Check its values.` }); }
     else show({ message: "Could not add the finding. Nothing changed." });
   };
 
@@ -352,7 +355,7 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
     {!wide && <Button size="sm" onClick={() => setTextHidden(true)}>Hide text</Button>}
   </>;
 
-  return <section className="cons-screen" aria-labelledby="cons-title">
+  return <TermIdsProvider ontologyIds={shownOntologyIds}><section className="cons-screen" aria-labelledby="cons-title">
     <header className="cons-header">
       <div className="cons-heading">
         {readOnly && props.back && <a className="cons-back btn btn-secondary btn-sm" href={routeHref(props.back)} onKeyDown={onSpaceActivate} onClick={event => {
@@ -440,5 +443,5 @@ export function ConsolidationScreen(props: ConsolidationScreenProps): JSX.Elemen
       message="Back to the start: groups where everyone agreed are taken over again, every other group opens without a preselection. The submissions and this consolidation stay. You can undo this right after."
       confirmLabel="Reopen all" onConfirm={() => { void reopenAll(); }} onCancel={() => setReopeningAll({ open: false, busy: false })} />
     <Toast toast={toast} onDismiss={dismiss} />
-  </section>;
+  </section></TermIdsProvider>;
 }

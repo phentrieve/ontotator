@@ -1,5 +1,5 @@
-import { ReanchorPanel, currentReanchorResolution, reanchorKey, reanchorRef, useReanchorContext } from "../variants/ReanchorPanel";
-import { useCarriedReview } from "../editor/carried/useCarriedReview";
+import { ReanchorPanel, currentReanchorResolution, oldWords, parseReanchorMark, reanchorKey, reanchorMarks, reanchorRef, suggestionsOf, useReanchorContext } from "../variants/ReanchorPanel";
+import { recreatedAnnotationId, useCarriedReview } from "../editor/carried/useCarriedReview";
 import { carriedChosenAxisIds, carriedListOrder as orderCarriedFirst, carriedNote, deriveCarriedStates, nextUncheckedKey, rowKeyOf, type CarriedState, type SnapshotLike } from "../editor/carried/checkState";
 import { canRestore, captureDeletedFinding, modifierRestoreCommands, restoreCommands, type DeletedFinding } from "../editor/restoreFinding";
 import { carriedOriginLine, TEXT_CHANGE_ORIGIN, instructionLine, missingReason, roundName, textSpanLine, valuesLines, whatToCheckContext, type WhatToCheckContext } from "../editor/carried/instructions";
@@ -10,6 +10,7 @@ import { PlaceholderRow } from "../editor/carried/PlaceholderRow";
 import { CarriedProgress } from "../editor/carried/CarriedProgress";
 import { SidebarResizer } from "../editor/SidebarResizer";
 import { useSidebarWidth } from "../editor/sidebarWidth";
+import { DETAILS_STRIP_WIDTH, detailsRailLimits, detailsWidthKey, useDetailsCollapsed } from "../editor/detailsRail";
 import { useTreeHeight } from "../editor/treeHeight";
 import { InspectorTabList, inspectorTabIds, useInspectorTabs } from "../editor/InspectorTabs";
 import type { GuidelinesPanel } from "../tasks/TaskGuidelines";
@@ -31,8 +32,8 @@ import { PausedNotice } from "../editor/PausedNotice";
 import { Textarea } from "../ui/Textarea";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { flushSync } from "react-dom";
+import React, { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal, flushSync } from "react-dom";
 import {
   api,
   isSessionProblem,
@@ -94,7 +95,9 @@ import { useSearchLanguages } from "../editor/searchLanguages";
 import { SearchPanel } from "../editor/SearchPanel";
 import { isUntouchedPrefill, passageText, prefillHint, prefillQuery } from "../editor/termSearch";
 import { focusTextAt } from "../editor/textFocus";
-import { useMediaQuery } from "../ui/useMediaQuery";
+import { useMediaQuery, useTouchOnly } from "../ui/useMediaQuery";
+import { ShellCaseBarSlot } from "../ui/AppShell";
+import { DismissibleHint, showHintsAgain, useHintsRead } from "../editor/DismissibleHint";
 import { SearchManager } from "../editor/searchState";
 import { TermName } from "../editor/TermName";
 import { TextPane } from "../editor/TextPane";
@@ -113,7 +116,7 @@ import { SpanExclusionOffer, exclusionCopy } from "../editor/SpanExclusionOffer"
 import { Toast } from "../ui/Toast";
 import { type MentionDisplay, type SelectionPayload } from "../spans/adapter";
 import { markColour } from "../editor/markColours";
-import { IconCheck, IconClose, IconLock, IconMore, IconPencil, IconQuestion, IconRedo, IconRetry, IconUndo } from "../ui/icons";
+import { IconCheck, IconChevronLeft, IconChevronRight, IconClose, IconLock, IconMore, IconPencil, IconQuestion, IconRedo, IconRetry, IconTree, IconUndo } from "../ui/icons";
 import { historyControls, stepText, type LastHistoryCommand } from "../editor/history";
 import { MenuButton, type MenuItem } from "../ui/MenuButton";
 import { isNegated } from "../editor/negation";
@@ -129,6 +132,7 @@ import { isReviewLike, modeBadge } from "../editor/modes";
 import { LanguageTag, LanguageText } from "../ui/LanguageTag";
 import { onSpaceActivate } from "../ui/spaceActivates";
 import { actorName } from "../editor/actorName";
+import { TermIdsProvider } from "../editor/termIds";
 
 const refKey = (r: { annotation_id: string; version: string }) => JSON.stringify([r.annotation_id, r.version]);
 
@@ -258,6 +262,11 @@ export interface CaseScreenProps {
   documentVersion?: number | null;
   /** `WorkRoundView.round_ordinal` of the open round; My submissions names it while it has no submission. */
   roundOrdinal?: number | null;
+  /**
+   * The round's latest submission with the time the server names for it: for an annotation a typo fix moved, when the
+   * person submitted (issue 575). The "Submitted" status shows that time while it is the shown submission.
+   */
+  roundSubmission?: { submissionId: string; recordedAt: string } | null;
   /** The working time control (issue 298), shown before the save status. */
   headerTimer?: React.ReactNode;
   /** Called whenever an edit is sent; the working time resumes on it. */
@@ -272,7 +281,11 @@ const PENDING_HANDLE_LABELS = { start: "Start of marked text", end: "End of mark
 /** Round kinds whose inputs are carried findings to check (a text change and a lead's handover included). */
 const isCarryKind = (kind: CaseScreenProps["roundKind"]): boolean => kind === "carry_forward" || kind === "text_change" || kind === "handover";
 
-export const CaseScreen: React.FC<CaseScreenProps> = ({
+/** The annotation screen. With the project setting on, one ontology's term ids are shown without the prefix (termIds.tsx). */
+export const CaseScreen: React.FC<CaseScreenProps> = (props) =>
+  <TermIdsProvider ontologyIds={props.view.hide_term_id_prefix ? (props.view.ontologies ?? []).map(item => item.ontology_id) : []}><CaseScreenBody {...props} /></TermIdsProvider>;
+
+const CaseScreenBody: React.FC<CaseScreenProps> = ({
   view,
   workspaceId,
   onClose,
@@ -282,7 +295,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   onSubmitted,
   annotatorName,
   leaveGuardRef,
-  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, holdTitle, holdKept, onTaskHeld, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, headerTimer, onEdit, changesSource,
+  readOnly: serverReadOnly = false, routeLeaveRef, assignmentNavigation, onReadonlyRequired, versionContext, menuItems = [], userPseudonym, guidelineNotice, guidelines = null, held = false, holdReason, holdTitle, holdKept, onTaskHeld, saveBeforeReportRef, roundInputs = NO_ROUND_INPUTS, roundKind, roundActive = true, roundBadge, roundTitle, documentVersion, roundOrdinal, roundSubmission, headerTimer, onEdit, changesSource,
 }) => {
   const versionIdentity = JSON.stringify([versionContext?.username, versionContext?.assignmentId, versionContext?.canBrowseVersions, workspaceId, view.key]);
   const [acceptedSubmission, setAcceptedSubmission] = useState<{ identity: string; value: Submission } | null>(null);
@@ -340,6 +353,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   // "Mark in text" waits for a text selection for this carried input.
   const [activeCarried, setActiveCarried] = useState<import("../api/client").RoundInputView | null>(null);
   const [resolutionItem, setResolutionItem] = useState<ReanchorItem | null>(null);
+  /** The pending text-change item selected in its panel or by its mark in the text (issue 633), and the suggested place in use per item. */
+  const [selectedReanchorKey, setSelectedReanchorKey] = useState<string | null>(null);
+  const [reanchorPlaces, setReanchorPlaces] = useState<Record<string, number>>({});
   const [spanlessReason, setSpanlessReason] = useState("");
   const [pendingEvidenceAdoption, setPendingEvidenceAdoption] = useState<TargetProposal | null>(null);
   const [pendingAdoption, setPendingAdoption] = useState<TargetProposal | null>(null);
@@ -524,8 +540,15 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const rootRef = useRef<HTMLDivElement>(null);
   // At ≤700 px the editor shows one pane at a time; marking text does not switch panes on its own.
   const panesLayout = useMediaQuery("(max-width: 700px)");
+  // A touch screen: the marking banners leave out keys (issue 612); the banner's Cancel ends the mode.
+  const touchOnly = useTouchOnly();
   // Below 1024 px the header keeps one bar: "Next open item" moves into "More", the mode text hides.
   const narrowHeader = useMediaQuery("(max-width: 1023px)");
+  // Issue 539: from 1025 px the case toolbar joins the app header in one bar (the header keeps a place for it).
+  const caseBarSlot = useContext(ShellCaseBarSlot);
+  const wideHeader = useMediaQuery("(min-width: 1025px)");
+  const headerMerged = !!caseBarSlot && wideHeader;
+  const hintsRead = useHintsRead();
   // Back to the text after a cancelled new finding: runs after the text pane re-rendered its runs,
   // so the caret lands in the current text nodes (offset null: focus only).
   const [textFocusRequest, setTextFocusRequest] = useState<{ offset: number | null } | null>(null);
@@ -1139,10 +1162,123 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         setActionError("Select the replacement finding in the findings list, then choose Complete text-change review.");return;
       }
       setLayerSelection(previous => setActiveLayer(previous,view.layers ?? [],view.scope,item.layer_id));
-      setActiveReanchor(item);setSelectionIntent("new_mention");setMobilePane("text");
-      reanchorContext.reveal(item.new_context);
+      setActiveReanchor(item);setSelectionIntent("new_mention");setMobilePane("text");setSelectedReanchorKey(reanchorKey(item));
+      // Without a reliable location the text only scrolls there: nothing is highlighted as if it were the place (issue 633).
+      reanchorContext.reveal(item.new_context, { highlight: reanchorMarks(item).length > 0 });
       leftTextElement?.focus();
     } catch(error) {reportError(error);}
+  };
+
+  /** The next unresolved text-change item after `fromKey` in panel order (wrapping), by the latest draft. */
+  const nextPendingReanchor = (fromKey: string | null, direction: 1 | -1 = 1): ReanchorItem | undefined => {
+    const current = latestDraft.current, all = pendingReanchorItems;
+    const open = (item: ReanchorItem) => !currentReanchorResolution(item, current.reanchor_resolutions ?? [], current.annotations ?? []);
+    const index = fromKey === null ? -1 : all.findIndex(item => reanchorKey(item) === fromKey);
+    for (let step = 1; step <= all.length; step++) {
+      const candidate = all[(((index === -1 && direction === -1 ? 0 : index) + direction * step) % all.length + all.length) % all.length];
+      if (open(candidate)) return candidate;
+    }
+    return undefined;
+  };
+  /**
+   * Selects a text-change item: its row in the panel and its mark in the text (the suggested place `place`, else
+   * the place in use). The text scrolls to the place and shows its context for a moment; without a reliable
+   * location it only scrolls there. `focusRow` focuses the row's first action and keeps the panel in view;
+   * `fromText` (a press on its mark) leaves the text where it is.
+   */
+  const selectReanchor = (item: ReanchorItem, { place, focusRow = false, fromText = false }: { place?: number; focusRow?: boolean; fromText?: boolean } = {}) => {
+    const key = reanchorKey(item), at = place ?? reanchorPlaces[key] ?? 0;
+    if (place !== undefined) setReanchorPlaces(previous => ({ ...previous, [key]: place }));
+    setSelectedReanchorKey(key);
+    const marks = reanchorMarks(item), mark = marks.find(value => value.place === at) ?? marks[0];
+    // The context is anchored at the first suggested place (or the new wording); another place is scrolled to by its mark.
+    if (!fromText) {
+      if (mark && mark.place !== null && mark.place > 0) setTextScrollRequest(previous => ({ evidenceId: mark.id, nonce: (previous?.nonce ?? 0) + 1, ifNeeded: true }));
+      else reanchorContext.reveal(item.new_context, { highlight: !!mark });
+    }
+    if (!focusRow) return;
+    setMobilePane("list");
+    requestAnimationFrame(() => { if (!focusReanchorRow(key)) reanchorFocusAfterSave.current = key; });
+  };
+  /**
+   * Focuses the row's first action and keeps it in view; false while its buttons are still disabled (the queue
+   * saves the step that resolved the previous item), so the focus follows once the save is done.
+   */
+  const focusReanchorRow = (key: string): boolean => {
+    const row = [...(sidebarScrollRef.current?.querySelectorAll<HTMLElement>('[data-reanchor-item]') ?? [])]
+      .find(element => element.dataset.reanchorItem === key);
+    for (let disclosure = row?.parentElement?.closest("details"); disclosure; disclosure = disclosure.parentElement?.closest("details")) disclosure.open = true;
+    row?.scrollIntoView?.({ block: "nearest" });
+    const target = row?.querySelector<HTMLElement>('[data-reanchor-primary]:not([aria-disabled="true"])') ?? row?.querySelector<HTMLElement>('button');
+    target?.focus({ preventScroll: true });
+    return !target || document.activeElement === target;
+  };
+  const reanchorFocusAfterSave = useRef<string | null>(null);
+  // The render that enables the buttons again (the save is done) hands the waiting focus on; a selection changed meanwhile drops it.
+  useEffect(() => {
+    const key = reanchorFocusAfterSave.current;
+    if (!key || queueState === "saving") return;
+    reanchorFocusAfterSave.current = null;
+    if (selectedReanchorKey === key) focusReanchorRow(key);
+  });
+  /** After an item is resolved: the next pending one is selected, in the panel and in the text; else the panel's count gets the focus. */
+  const afterReanchorResolved = (item: ReanchorItem) => {
+    const next = nextPendingReanchor(reanchorKey(item));
+    if (next) { selectReanchor(next, { focusRow: true }); return; }
+    setSelectedReanchorKey(null);
+    requestAnimationFrame(() => sidebarScrollRef.current?.querySelector<HTMLElement>('[data-reanchor-status]')?.focus({ preventScroll: true }));
+  };
+  /**
+   * Values the annotator still has to check before the review of a re-created finding is complete: defaulted values
+   * in a project that requires chosen ones. Otherwise defaulted values stay open items, as on any finding.
+   */
+  const valuesToCheck = (item: ReanchorItem) => !!view.require_chosen_axes && (item.axes_defaulted?.length ?? 0) > 0;
+  /**
+   * "Use this location": re-creates the finding at a suggested place with its term and values, and completes its
+   * text-change review in the same step. With values still to check the finding opens instead, to confirm them first.
+   */
+  const applyReanchorLocation = (item: ReanchorItem, place: number) => void inStep(async () => {
+    if (creatingPending.current) return;
+    try {
+      assertWritable();
+      await flushAnnotationNotes();
+      if (unsavedAnnotationNotes().length) { setActionError("Save the annotation note before re-creating another finding."); return; }
+      const segments = suggestionsOf(item)[place], typeId = item.type_id;
+      const layer = view.layers?.find(value => value.layer_id === item.layer_id);
+      if (!segments) return;
+      if (!typeId || !layer?.annotation_types.some(type => type.type_id === typeId) || !view.scope.editable_layer_ids.includes(item.layer_id)) {
+        setActionError("The original finding type is unavailable for re-creation. You can still dismiss this finding with a reason.");return;
+      }
+      creatingPending.current = true;
+      cancelPending();
+      setLayerSelection(previous => setActiveLayer(previous, view.layers ?? [], view.scope, item.layer_id));
+      setSelectedReanchorKey(reanchorKey(item));
+      const annotationId = `ann-${crypto.randomUUID()}`, evidenceId = newEvidenceId();
+      const term = termLabel(item.layer_id, item.term_id) || item.term_id;
+      await enqueueMutation({ command: "recreate_reanchor", item: reanchorRef(item), annotation_id: annotationId, evidence_id: evidenceId,
+        layer_id: item.layer_id, type_id: typeId, term_id: item.term_id, axes_values: item.axes_values ?? {},
+        segments: segments.map(({ start, end }) => ({ start, end })) });
+      if (valuesToCheck(item)) {
+        setResolutionItem(item);
+        setSelectedTargetId(null); setSelectedSourceId(null);
+        setSelectedAnnotationId(annotationId); setSelectedEvidenceId(evidenceId); setMobilePane("details");
+        announceCarried(`${term} re-created on “${oldWords(item)}”. Confirm its values, then complete the text-change review.`);
+        requestAnimationFrame(() => (inspectorRef.current?.querySelector<HTMLElement>('[data-confirm-defaults]')
+          ?? inspectorRef.current?.querySelector<HTMLElement>('button, input, textarea, select'))?.focus({ preventScroll: true }));
+        return;
+      }
+      await resolveReanchor(item, "recreated", annotationId);
+      announceCarried(`${term} re-created on “${oldWords(item)}”.`);
+      afterReanchorResolved(item);
+    } catch (error) { reportError(error); }
+    finally { creatingPending.current = false; }
+  });
+  /** The values of an item that differ from the defaults of its type, as one line; null when none do. */
+  const reanchorValues = (item: ReanchorItem): string | null => {
+    const defaults: Record<string, string | null | undefined> = (item.type_id ? view.creation_defaults?.[item.layer_id]?.[item.type_id] : undefined) ?? {};
+    const shown = Object.entries(item.axes_values ?? {}).filter(([axis, value]) => value !== null && value !== undefined
+      && !(item.axes_defaulted ?? []).includes(axis) && value !== defaults[axis]);
+    return shown.length ? shown.map(([axis, value]) => `${axis}: ${value}`).join(", ") : null;
   };
 
   /** Selects a proposal and its first mark, as a click on its list row does. */
@@ -1470,7 +1606,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       : state.missing === "deleted" ? "placeholder:deleted" as const : "placeholder:mapping_failed" as const);
     return instructionLine(carriedContext(state.input).context, state.variant, where);
   };
-  /** The finding re-created via "Mark in text" for a placeholder input, while it exists (client-side link). */
+  /** The finding re-created via "Mark in text" for a placeholder input, while it exists (linked by its ID, issue 652). */
   const recreatedFinding = (state: CarriedState) => {
     const id = state.homeId ? undefined : carried.recreatedFor[state.input.input_id];
     return id ? draft.annotations?.find(snapshot => snapshot.annotation.annotation_id === id) : undefined;
@@ -1543,7 +1679,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     deriveCarriedStates(carriedInputs, latestDraft.current.round_input_resolutions ?? [], latestDraft.current.annotations ?? [])
       .find(state => state.input.input_id === inputId);
   const carriedReadOnly: CarriedReadOnly = !readOnly ? false : display !== null ? "older" : held ? "paused" : "submitted";
-  const submittedAt = carriedReadOnly === "submitted" ? submissions.at(-1)?.created_at : undefined;
+  const lastSubmission = submissions.at(-1);
+  const submittedAt = carriedReadOnly !== "submitted" ? undefined
+    : lastSubmission && roundSubmission?.submissionId === lastSubmission.submission_id ? roundSubmission.recordedAt : lastSubmission?.created_at;
   const showCarriedOriginal = (state: CarriedState) =>
     setOriginalRoundInput(carriedInputs.find(input => input.input_id === state.input.input_id) ?? null);
 
@@ -1940,7 +2078,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     if (activeCarried) {
       const input = activeCarried, source = input.source_snapshot.annotation;
       handleDeselectAll();
-      setPendingAnnotation({ annotationId: `ann-${crypto.randomUUID()}`, evidenceId: newEvidenceId(), layerId: source.layer_id,
+      // The ID names the input: the link to it is saved with the finding and survives a reload (issue 652).
+      setPendingAnnotation({ annotationId: recreatedAnnotationId(input.input_id), evidenceId: newEvidenceId(), layerId: source.layer_id,
         typeId: source.type_id, segments: payload.segments, carriedInput: input });
       return;
     }
@@ -2118,10 +2257,12 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         catch { notCopied.push(termLabel(pending.layerId, modifier.term_id) ?? modifier.term_id); }
       }
       if (notCopied.length) announceCarried(`Could not copy modifier ${notCopied.join(", ")}.`);
-      if (pending.reanchorItem) setResolutionItem(pending.reanchorItem);
-      // Linked client-side as the input's result; the input stays "Check needed" (no auto-complete).
+      // A re-created finding whose values need no check completes its text-change review in the same step (issue 633).
+      const completed = pending.reanchorItem && !valuesToCheck(pending.reanchorItem) ? pending.reanchorItem : null;
+      if (completed) await resolveReanchor(completed, "recreated", pending.annotationId);
+      else if (pending.reanchorItem) setResolutionItem(pending.reanchorItem);
+      // Linked as the input's result by its ID; the input stays "Check needed" (no auto-complete).
       if (pending.carriedInput) {
-        carried.rememberRecreated(pending.carriedInput.input_id, pending.annotationId);
         setFocusRequest({ key: `annotation:${pending.annotationId}`, find: carriedPrimary });
       }
       setPendingAnnotation(null);
@@ -2129,9 +2270,15 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       setSpanlessReason(""); setSpanlessReasonError(false);
       setSelectedTargetId(null);
       setSelectedSourceId(null);
-      setSelectedAnnotationId(pending.annotationId);
-      setSelectedEvidenceId(pending.evidenceId ?? null);
+      setSelectedAnnotationId(completed ? null : pending.annotationId);
+      setSelectedEvidenceId(completed ? null : pending.evidenceId ?? null);
       searchManager.clear();
+      if (completed) {
+        setActiveReanchor(null);
+        announceCarried(`${termLabel(completed.layer_id, termId) || termId} re-created.`);
+        afterReanchorResolved(completed);
+        return;
+      }
       // A newly marked span continues the loop: values next, then back to the text (spec B.2).
       if (!pending.isSpanless && !pending.reanchorItem && !pending.carriedInput) {
         setLoopFocus({ annotationId: pending.annotationId, termText: termText ?? null });
@@ -2147,6 +2294,12 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
 
   const handlePickMention = (evidenceId: string) => {
     if (evidenceId === pendingAnnotation?.evidenceId) return;
+    const reanchorMark = parseReanchorMark(evidenceId);
+    if (reanchorMark) {
+      const item = pendingReanchorItems.find(value => reanchorKey(value) === reanchorMark.key);
+      if (item) selectReanchor(item, { place: reanchorMark.place ?? undefined, focusRow: true, fromText: true });
+      return;
+    }
     const pickedModifier = parseModifierDisplayId(evidenceId);
     if (attachActive) {
       // A finding's mark is a target of the attach mode: a click attaches instead of selecting.
@@ -2329,15 +2482,18 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     if (treeMode === "assign") { await setTermOf(treeWalk.annotationId, termId, browseId); return; }
     if (treeMode === "new") { await choosePendingTerm(termId, browseId, label); return; }
     if (treeMode !== "proposal" || !selectedTarget) return;
-    const walk = treeWalk;
-    // The copy takes the walk's id: the tree stays with it, and the term passes the walk's check.
-    setTreeWalk(current => current && current.nonce === walk.nonce ? { ...current, key: annotationKey(walk.annotationId) } : current);
-    const copyId = await handleAdoptAndEditTarget(selectedTarget, undefined, undefined, { annotationId: walk.annotationId });
-    if (!copyId) {
-      setTreeWalk(current => current && current.nonce === walk.nonce ? { ...current, key: walk.key } : current);
-      throw new Error("Nothing was changed.");
-    }
-    await setTermOf(copyId, termId, copyId === walk.annotationId ? browseId : undefined);
+    const walk = treeWalk, target = selectedTarget;
+    // One step (issue 542, U1-03): Undo takes back the copy and its term together, as a modifier change on a proposal does.
+    await inStep(async () => {
+      // The copy takes the walk's id: the tree stays with it, and the term passes the walk's check.
+      setTreeWalk(current => current && current.nonce === walk.nonce ? { ...current, key: annotationKey(walk.annotationId) } : current);
+      const copyId = await handleAdoptAndEditTarget(target, undefined, undefined, { annotationId: walk.annotationId });
+      if (!copyId) {
+        setTreeWalk(current => current && current.nonce === walk.nonce ? { ...current, key: walk.key } : current);
+        throw new Error("Nothing was changed.");
+      }
+      await setTermOf(copyId, termId, copyId === walk.annotationId ? browseId : undefined);
+    });
   };
 
   // Closing changes nothing else: the tree is gone until "Show in tree" is used again. A
@@ -2931,21 +3087,6 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   };
 
   const editableLayerIds = view.scope?.editable_layer_ids ?? (view.layers ? view.layers.map(l => l.layer_id) : []);
-  // Only the selected curated annotation's mentions can be resized, and not while
-  // another text interaction (attaching a mention, choosing a term) is in progress.
-  // A newly marked span (not re-anchor, not carried) can be adjusted before a term is chosen.
-  const pendingEvidenceId = pendingIsMarkedSpan ? pendingAnnotation?.evidenceId : undefined;
-  const resizableEvidenceIds = readOnly || isAttachingMention ? []
-    : pendingEvidenceId ? [pendingEvidenceId]
-      : selectedAnnotation && !pendingAnnotation && editableLayerIds.includes(selectedAnnotation.annotation.layer_id)
-        ? (selectedAnnotation.annotation.evidence_refs ?? []).map((r) => r.evidence_id)
-        : [];
-  // The handles of a finding's mentions name the finding ("Start of Seizure mention").
-  const resizableLabels = pendingEvidenceId ? { [pendingEvidenceId]: PENDING_HANDLE_LABELS }
-    : selectedAnnotation ? Object.fromEntries(resizableEvidenceIds.map(id => {
-      const name = findingNameOf(selectedAnnotation);
-      return [id, { start: `Start of ${name} mention`, end: `End of ${name} mention` }];
-    })) : undefined;
 
   // --- Modifiers: attach mode (E-a), framing, link a text span -------------------------------------
   const ownerOfEvidence = (evidenceId: string) => visibleAnnotations.find(snapshot =>
@@ -2990,6 +3131,26 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     }];
   })];
   const attachActive = !!attachModifier && (attachModifier.mode === "convert" || pendingIsMarkedSpan) && !readOnly && attachTargets.length > 0;
+  /** The text pane waits for new text (a mention, a modifier's span, a re-anchor, a copy): a selection there picks
+   *  text, it never resizes a mention. Attaching a modifier also shows the banner, but keeps the pending mark
+   *  resizable: that mark is the modifier's text. */
+  const pickingText = !!linkSpan || isAttachingMention || !!activeReanchor || !!activeCarried
+    || (!!pendingEvidenceAdoption && !confirmRequest);
+  // Only the selected curated annotation's mentions can be resized, and not while the text pane waits for new text.
+  // Otherwise a drag that starts on the finding's first letter grabs its handle and resizes the finding (issue 583).
+  // A newly marked span (not re-anchor, not carried) can be adjusted before a term is chosen.
+  const pendingEvidenceId = pendingIsMarkedSpan ? pendingAnnotation?.evidenceId : undefined;
+  const resizableEvidenceIds = readOnly || pickingText ? []
+    : pendingEvidenceId ? [pendingEvidenceId]
+      : selectedAnnotation && !pendingAnnotation && editableLayerIds.includes(selectedAnnotation.annotation.layer_id)
+        ? (selectedAnnotation.annotation.evidence_refs ?? []).map((r) => r.evidence_id)
+        : [];
+  // The handles of a finding's mentions name the finding ("Start of Seizure mention").
+  const resizableLabels = pendingEvidenceId ? { [pendingEvidenceId]: PENDING_HANDLE_LABELS }
+    : selectedAnnotation ? Object.fromEntries(resizableEvidenceIds.map(id => {
+      const name = findingNameOf(selectedAnnotation);
+      return [id, { start: `Start of ${name} mention`, end: `End of ${name} mention` }];
+    })) : undefined;
   const attachSegments = attachModifier?.mode === "convert" ? attachModifier.mark : pendingAnnotation?.segments ?? [];
   const attachMark = attachSegments.length
     ? { start: Math.min(...attachSegments.map(s => s.start)), end: Math.max(...attachSegments.map(s => s.end)) } : null;
@@ -3247,26 +3408,32 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       .map(mark => ({ ...mark, evidence_id: `target:${t.annotation_id}:${t.version}:${mark.evidence_id}` }));
   });
   const attachFramed = attachFocusId ?? attachNearest?.annotationId ?? null;
-  const framedIds = attachActive ? (attachFramed ? framingIds(attachFramed, true) : [])
+  // The selected text-change item frames its mark at the place in use, when nothing else is framed.
+  const selectedReanchorEntry = selectedReanchorKey ? pendingReanchorItems.find(item => reanchorKey(item) === selectedReanchorKey) : undefined;
+  const reanchorFramed = selectedReanchorEntry && !attachActive ? reanchorMarks(selectedReanchorEntry)
+    .filter(mark => mark.place === null || mark.place === (reanchorPlaces[selectedReanchorKey!] ?? 0)).map(mark => mark.id) : [];
+  const otherFramed = attachActive ? (attachFramed ? framingIds(attachFramed, true) : [])
     : hoverFrameId ? framingIds(hoverFrameId, true)
       : selectedAnnotationId ? framingIds(selectedAnnotationId, false)
         : selectedTarget ? proposalModifierMarks.map(mark => mark.evidence_id)
           .filter(id => id.startsWith(`target:${selectedTarget.annotation_id}:${selectedTarget.version}:`)) : [];
+  const framedIds = otherFramed.length || selectedAnnotationId || selectedTargetId || selectedSourceId ? otherFramed : reanchorFramed;
   const handleHoverMentions = (ids: string[]) => {
     const owner = ids.map(id => parseModifierDisplayId(id)?.annotationId ?? ownerOfEvidence(id)?.annotation.annotation_id).find(Boolean);
     setHoverFrameId(owner ?? null);
   };
 
   // One line above the text, only while a marking mode waits for text (spec C.6).
+  const escCancels = touchOnly ? "" : " Esc cancels.";
   const intentTerm = selectedAnnotation
     ? termLabel(selectedAnnotation.annotation.layer_id, selectedAnnotation.annotation.term_id) || selectedAnnotation.annotation.term_id
     : null;
   const extendedMention = selectedAnnotation && selectedEvidenceId
     ? (selectedAnnotation.annotation.evidence_refs ?? []).findIndex(ref => ref.evidence_id === selectedEvidenceId) + 1 : 0;
   const intentMessage = readOnly || !intentTerm ? null
-    : isAttachingMention ? `Adding a mention to ${intentTerm}. Mark the text. Esc cancels.`
+    : isAttachingMention ? `Adding a mention to ${intentTerm}. Mark the text.${escCancels}`
     : selectionIntent === "extend_mention" && extendedMention > 0
-      ? `Adding a segment to mention ${extendedMention} of ${intentTerm}. Mark the text. Esc cancels.` : null;
+      ? `Adding a segment to mention ${extendedMention} of ${intentTerm}. Mark the text.${escCancels}` : null;
 
   const openReviewTargets = reviewTargets.filter(
     (t) => !(draft.decisions ?? []).some((d) => refKey(d.target) === refKey(t)),
@@ -3439,14 +3606,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     const item = pendingReanchorItems.find(item => (key === undefined || reanchorKey(item) === key)
       && !currentReanchorResolution(item, draft.reanchor_resolutions ?? [], draft.annotations ?? []));
     if (!item) return;
-    setSubmitDialogOpen(false); setMobilePane("list");
-    requestAnimationFrame(() => {
-      const row = [...(sidebarScrollRef.current?.querySelectorAll<HTMLElement>('[data-reanchor-item]') ?? [])]
-        .find(row => row.dataset.reanchorItem === reanchorKey(item));
-      const disclosure = row?.closest("details");
-      if (disclosure) disclosure.open = true;
-      row?.scrollIntoView?.({ block: "nearest" }); row?.querySelector<HTMLButtonElement>('button')?.focus();
-    });
+    setSubmitDialogOpen(false);
+    selectReanchor(item, { focusRow: true });
   };
 
   const blockInvalidUnresolvedNotes = (action: "submitting" | "leaving" = "submitting") => {
@@ -3665,18 +3826,39 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
   const inspectorIdBase = `inspector${React.useId()}`;
   const inspectorIds = inspectorTabIds(inspectorIdBase);
   const guidelinesPanelRef = useRef<HTMLElement>(null);
+  const inspectorDemand = {
+    key: JSON.stringify([pendingAnnotation?.annotationId ?? null, attachModifier?.mode ?? null, requiredNoteKey, loopFocus?.annotationId ?? null, focusRequest?.key ?? null]),
+    active: !!(pendingAnnotation || attachModifier || requiredNoteKey !== null || loopFocus || focusRequest),
+  };
   const tabs = useInspectorTabs({
     hosted: guidelinesHosted, open: !!guidelines?.open, request: guidelines?.request ?? 0, returnFocus: guidelines?.returnFocus,
     scroller: inspectorRef, panel: guidelinesPanelRef,
     // Work that needs a field of the inspector brings Details to the front; selecting a finding does not.
-    demand: {
-      key: JSON.stringify([pendingAnnotation?.annotationId ?? null, attachModifier?.mode ?? null, requiredNoteKey, loopFocus?.annotationId ?? null, focusRequest?.key ?? null]),
-      active: !!(pendingAnnotation || attachModifier || requiredNoteKey !== null || loopFocus || focusRequest),
-    },
+    demand: inspectorDemand,
   });
   const guidelinesTab = tabs.hosted && tabs.tab === "guidelines";
   // The findings column's limits follow the inspector, which is at least 420 px while it holds the guidelines.
   const sidebarWidth = useSidebarWidth(versionContext?.username, { inspectorWithGuidelines: tabs.hosted });
+  // Issue 540: the right column is a rail, as "Your review" in the translation review (issue 410). From 1060 px (three
+  // columns) its left edge can be dragged and it can be collapsed to a narrow strip; both are kept per user in this browser.
+  const railOn = threeColumns && !compareOpen;
+  const detailsRail = useSidebarWidth(versionContext?.username, { inspectorWithGuidelines: tabs.hosted, storageKeyFor: detailsWidthKey, limitsFor: detailsRailLimits });
+  const [detailsCollapsedChoice, setDetailsCollapsed] = useDetailsCollapsed(versionContext?.username);
+  const detailsCollapsed = railOn && detailsCollapsedChoice;
+  /** Collapses or expands the column; the focus moves to the control that replaces the clicked one. */
+  const collapseDetails = (collapsed: boolean) => {
+    setDetailsCollapsed(collapsed);
+    window.requestAnimationFrame(() => rootRef.current?.querySelector<HTMLElement>(collapsed ? ".details-rail-expand" : ".details-rail-collapse")?.focus());
+  };
+  /** The name of what the folded column would show: the selected finding, else the selected proposal (issue 596). */
+  const stripSelection = !detailsCollapsed ? null
+    : selectedAnnotation ? termLabel(selectedAnnotation.annotation.layer_id, selectedAnnotation.annotation.term_id) || selectedAnnotation.annotation.term_id
+      : selectedTarget?.term_id ? termLabel(selectedTarget.layer_id ?? "", selectedTarget.term_id) || selectedTarget.term_id : null;
+  // Work that needs the panel (a new mark and its term search, a required note, …) opens a collapsed column again.
+  useEffect(() => {
+    if (detailsCollapsed && inspectorDemand.active) setDetailsCollapsed(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only new work opens the column
+  }, [inspectorDemand.key]);
   // The ontology tree's height under the inspector, set by dragging the divider above it.
   const treeHeight = useTreeHeight(versionContext?.username, treeWalk && !treeCollapsed ? treeWalk.nonce : null);
   // Issue 521, a low window: the open tree takes the whole right column and the annotation panel shrinks to one
@@ -3903,9 +4085,17 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
     void handleReviewDecision({ outcome: null });
   }, { ...reviewShortcutOptions, description: "Reset selected review decision to open, or discard your copy" });
   // Single-character bindings ignore Shift, so Shift+N reaches this handler too.
-  useShortcut("n", event => goToUnchecked(event.shiftKey ? -1 : 1) ? undefined : false,
-    { ...shortcutOptions, enabled: carriedActive && !display, group: "Carried findings", description: "Next unchecked carried finding" });
+  // Without carried findings, "n" moves through the items that need review after the text change (issue 633).
+  const reanchorStepping = !carriedActive && unresolvedReanchorCount > 0;
+  useShortcut("n", event => {
+    if (carriedActive) return goToUnchecked(event.shiftKey ? -1 : 1) ? undefined : false;
+    const next = nextPendingReanchor(selectedReanchorKey, event.shiftKey ? -1 : 1);
+    if (!next) return false;
+    selectReanchor(next, { focusRow: true });
+  }, { ...shortcutOptions, enabled: (carriedActive || reanchorStepping) && !display,
+    group: carriedActive ? "Carried findings" : "Text change", description: carriedActive ? "Next unchecked carried finding" : "Next item that needs review after the text change" });
   useShortcutHint(["Shift + N"], "Previous unchecked carried finding", { group: "Carried findings", enabled: carriedActive && !display });
+  useShortcutHint(["Shift + N"], "Previous item that needs review after the text change", { group: "Text change", enabled: reanchorStepping && !display });
   const checkableCarried = selectedCarriedState?.unchecked && !carried.busy(selectedCarriedState.input.input_id) ? selectedCarriedState : undefined;
   useShortcut("c", event => {
     // Plain "c" only: Shift+C is not this shortcut.
@@ -4035,6 +4225,14 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       return entry ? { ...mention, label: attachCopy.targetName(attachModifier!.termLabel, entry.term) } : mention;
     }),
     ...sourceMentions,
+    // Each item that needs review after the text change, where its words are now or where they were (issue 633).
+    ...(display ? [] : pendingReanchorItems.filter(item => !currentReanchorResolution(item, draft.reanchor_resolutions ?? [], draft.annotations ?? []))
+      .flatMap(item => {
+        const term = termLabel(item.layer_id, item.term_id) || item.term_id, words = oldWords(item);
+        return reanchorMarks(item).map(mark => ({ evidence_id: mark.id, segments: mark.segments, kind: "pending" as const,
+          label: mark.place === null ? `${term}: was “${words}”. Needs review after the text change.`
+            : `${term} on “${words}”: needs review after the text change.` }));
+      })),
     ...(pendingAnnotation && !pendingAnnotation.isSpanless && pendingAnnotation.evidenceId
       ? [{ evidence_id: pendingAnnotation.evidenceId, segments: pendingAnnotation.segments }]
       : []),
@@ -4059,8 +4257,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
       <div className="visually-hidden" aria-live="polite" data-carried-announcer>{carriedAnnouncement}</div>
       {/* The Undo toast of a removed modifier or a deleted finding; its live region exists only where findings can be edited. */}
       {(modifierLayerIds.size > 0 || !readOnly) && <Toast toast={modifierCommands.toast} onDismiss={modifierCommands.dismissToast} undoDescription="Undo deleting a finding or removing a modifier" undoGroup="Finding" />}
-      {/* Header */}
-      <Toolbar className="case-toolbar" label="Case">
+      {/* Header: in the app header's bar from 1025 px (issue 539), else above the panes. */}
+      {(caseToolbar => headerMerged && caseBarSlot ? createPortal(caseToolbar, caseBarSlot) : caseToolbar)(
+      <Toolbar className={headerMerged ? "case-toolbar case-toolbar--merged" : "case-toolbar"} label="Case">
         <div className={(assignmentNavigation ? assignmentTasks?.length ?? 0 : documentList?.length ?? 0) <= 1 ? "app-title app-title--single-case" : "app-title"}>
           {assignmentNavigation && assignmentTasks?.length ? (
             <CaseNavigation documents={assignmentTasks.map((task, index) => ({ document_id: task.document_id, case_id: task.case_id ?? task.external_id ?? undefined,
@@ -4083,12 +4282,15 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           {assignmentNavigation
             ? <h1 className="case-title" title={view.document.document_id}><LanguageText text={taskText(assignmentNavigation.current)} code={assignmentNavigation.current.language} /></h1>
             : <><h1 className="case-title" title={view.document.document_id}>{view.document.document_id}</h1><LanguageTag code={view.document.language} /></>}
-          <span
-            title={roundTitle ?? (roundKind !== "consolidation" && !isCarryKind(roundKind) ? badge.title : undefined)}
-            className="case-mode"
-          >
-            {roundKind === "consolidation" ? modeBadge("review").label : roundKind === "text_change" && roundInputs.length > 0 ? TEXT_CHANGE_ORIGIN : isCarryKind(roundKind) ? roundBadge ?? "Review carried findings" : badge.label}
-          </span>
+          {(() => {
+            // Issue 652: "Check after text change" only while something still needs a check; then the round's name.
+            const textChangeOpen = roundKind === "text_change" && (carried.states.some(state => state.unchecked) || unresolvedReanchorCount > 0);
+            const modeText = roundKind === "consolidation" ? modeBadge("review").label : textChangeOpen ? TEXT_CHANGE_ORIGIN : isCarryKind(roundKind) ? roundBadge ?? "Review carried findings" : badge.label;
+            // Issue 596: in the merged bar a long mode takes two lines rather than an ellipsis; --mode-half is about
+            // half its length, the least width at which two lines hold it (editor.css).
+            return <span title={roundTitle ?? (roundKind !== "consolidation" && !isCarryKind(roundKind) ? badge.title : undefined)}
+              className="case-mode" style={{ "--mode-half": `${Math.ceil(modeText.length / 2) + 1}ch` } as CSSProperties}>{modeText}</span>;
+          })()}
           {readOnly && consolidationAssignmentId ? <a className="btn btn-secondary btn-sm" href={routeHref({ name: "task", assignmentId: consolidationAssignmentId })} onKeyDown={onSpaceActivate}>{BACK_TO_CONSOLIDATION}</a> : null}
           {/* The display name has a bounded width (full text in the title), so the header
               does not need another line; the pseudonym is never shortened. */}
@@ -4157,6 +4359,8 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             // Below 1024 px "Next open item" leaves the bar for this menu.
             ...(narrowHeader && !readOnly && openItems.length > 0 ? [{ id: "next-open", label: "Next open item", onSelect: goToNextOpenItem }] : []),
             { id: "shortcuts", label: "Keyboard shortcuts (?)", onSelect: openShortcutHelp },
+            // Issue 540: hints hidden once read come back from here.
+            ...(hintsRead.length ? [{ id: "show-hints", label: "Show hints again", onSelect: showHintsAgain }] : []),
           ]} />
           {/* Read-only (submitted, paused, an older version): no edit controls. A consolidation is submitted only on
               its own screen (issue 162): its full editor offers the way back instead of a submit. */}
@@ -4166,6 +4370,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
             pending={submitPending}
             openCount={submitOpenCount(openItems, unconfirmed)}
             onNextOpen={narrowHeader ? undefined : goToNextOpenItem}
+            compact={headerMerged}
           />}
           {!readOnly && consolidationEditor && !narrowHeader && openItems.length > 0
             && <Button type="button" size="sm" onClick={goToNextOpenItem}>Next open item</Button>}
@@ -4175,7 +4380,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               onKeyDown={onSpaceActivate}>{BACK_TO_CONSOLIDATION}</a>
           </> : null}
         </div>
-      </Toolbar>
+      </Toolbar>)}
 
       {held && <PausedNotice title={holdTitle} reason={holdReason} kept={`Saved work remains readable. Your local input is kept.${holdKept ? ` ${holdKept}` : ""}`} />}
       {!!versionError && <><ErrorNotice error={versionError} /><Button onClick={retryVersions}>Retry version list</Button></>}
@@ -4223,14 +4428,15 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
         ))}
       </nav>
       {/* Main Workspace Layout */}
-      <div className={`app-layout mobile-pane-${mobilePane}${treeShown ? " tree-open" : ""}${treeHeight.height !== null && !panelGivenToTree ? " tree-sized" : ""}${panelGivenToTree ? ` panel-given-to-tree panel-given-to-tree--${panelGivenToTree}` : ""}${tabs.hosted ? " inspector-with-guidelines" : ""}`}
-        style={{ "--sidebar-width": `${sidebarWidth.width}px`, ...(treeHeight.height !== null && !panelGivenToTree ? { "--tree-height": `${treeHeight.height}px` } : {}) } as CSSProperties}>
+      <div className={`app-layout mobile-pane-${mobilePane}${treeShown ? " tree-open" : ""}${treeHeight.height !== null && !panelGivenToTree ? " tree-sized" : ""}${panelGivenToTree ? ` panel-given-to-tree panel-given-to-tree--${panelGivenToTree}` : ""}${tabs.hosted ? " inspector-with-guidelines" : ""}${detailsCollapsed ? " details-collapsed" : ""}`}
+        style={{ "--sidebar-width": `${sidebarWidth.width}px`, ...(treeHeight.height !== null && !panelGivenToTree ? { "--tree-height": `${treeHeight.height}px` } : {}),
+          ...(railOn ? { "--inspector-width": `${detailsCollapsed ? DETAILS_STRIP_WIDTH : detailsRail.width}px` } : {}) } as CSSProperties}>
         {/* Left: Sidebar (Annotations & Review Targets) */}
         <aside className="sidebar density-compact" id="findings-column">
           {/* Narrow layout: attach mode opens on Findings, where the text pane's banner and its Cancel are out of sight. */}
           {panesLayout && attachActive && attachModifier && mobilePane === "list" && <div role="status" className="attach-mention-banner attach-mention-banner--list">
-            <span>{attachCopy.banner(attachModifier.termLabel)}</span>
-            <Button size="sm" aria-keyshortcuts="Escape" onClick={cancelAttachModifier}>Cancel (Esc)</Button>
+            <span>{attachCopy.banner(attachModifier.termLabel, touchOnly)}</span>
+            <Button size="sm" aria-keyshortcuts={touchOnly ? undefined : "Escape"} onClick={cancelAttachModifier}>{touchOnly ? "Cancel" : "Cancel (Esc)"}</Button>
           </div>}
           {/* Multi-layer controls (rendered only if >1 layer) */}
           <LayerControls
@@ -4246,6 +4452,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
 
           <div className="sidebar-scroll" ref={sidebarScrollRef}>
             <ReanchorPanel key={versionIdentity} items={pendingReanchorItems} labelFor={termLabel} onContext={reanchorContext.reveal}
+              selectedKey={selectedReanchorKey} placeOf={item => reanchorPlaces[reanchorKey(item)] ?? 0}
+              onSelect={(item, place) => selectReanchor(item, { place })} valuesOf={reanchorValues} onResolved={afterReanchorResolved}
+              onUseLocation={readOnly ? undefined : applyReanchorLocation}
               onOpenFinding={id => { setSelectedTargetId(null); setSelectedSourceId(null); cancelPending(); setSelectedAnnotationId(id); setMobilePane("details"); }}
               resolutions={draft.reanchor_resolutions} annotations={draft.annotations} busy={queueState === "saving"}
               recreateUnavailableReason={item=>!view.scope.editable_layer_ids.includes(item.layer_id) || !view.layers?.find(layer=>layer.layer_id===item.layer_id)?.annotation_types.some(type=>type.type_id===item.type_id)
@@ -4460,10 +4669,11 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           contextSegments={reanchorContext.contextSegments}
           text={view.document.text}
           mentions={textMentions}
-          isAttachingMention={attachActive || !!linkSpan || isAttachingMention || !!activeReanchor || !!activeCarried || (!!pendingEvidenceAdoption && !confirmRequest)}
-          attachMessage={attachActive && attachModifier ? attachCopy.banner(attachModifier.termLabel)
-            : linkSpan ? `Select the text for ${linkSpan.term}, then press Enter. Esc cancels.`
-            : activeCarried ? `Select supporting text to re-create ${carriedTermText(activeCarried.source_snapshot)}.` : activeReanchor ? `Select supporting text to re-create ${activeReanchor.term_id}. Save the finding, review its values, then complete the text-change review.` : pendingEvidenceAdoption ? `${targetRequiresSpan(pendingEvidenceAdoption) ? "This annotation type requires a text span. " : ""}Select supporting text to create an editable copy of this proposal. The current decision is kept until you confirm the replacement.` : undefined}
+          isAttachingMention={attachActive || pickingText}
+          attachMessage={attachActive && attachModifier ? attachCopy.banner(attachModifier.termLabel, touchOnly)
+            // Releasing the mouse (or Shift after Shift + arrows) links the span; Enter is not needed (issue 612).
+            : linkSpan ? `Select the text for ${linkSpan.term}.${escCancels}`
+            : activeCarried ? `Select supporting text to re-create ${carriedTermText(activeCarried.source_snapshot)}.` : activeReanchor ? `Select supporting text to re-create ${termLabel(activeReanchor.layer_id, activeReanchor.term_id) || activeReanchor.term_id}${reanchorMarks(activeReanchor).length ? "" : `: “${oldWords(activeReanchor)}” is not in the corrected text`}.` : pendingEvidenceAdoption ? `${targetRequiresSpan(pendingEvidenceAdoption) ? "This annotation type requires a text span. " : ""}Select supporting text to create an editable copy of this proposal. The current decision is kept until you confirm the replacement.` : undefined}
           intentMessage={intentMessage}
           // TextPane owns Esc while a banner is shown (window capture): each mode cancels through its own handler.
           onCancelAttach={attachActive ? cancelAttachModifier : linkSpan ? cancelLinkSpan : cancelAttach}
@@ -4483,8 +4693,24 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           scrollRequest={textScrollRequest}
         />
 
+        {/* The right column's edge (issue 540): drag it, or use the arrow keys on it, to resize the column; the button
+            beside it collapses the column to a strip. Three columns only (editor.css). */}
+        {railOn && !detailsCollapsed && <div className="details-rail-edge">
+          <SidebarResizer side="start" label="Resize details panel" hint="Resize the details panel (focus the divider)" controls="details-column"
+            width={detailsRail.width} limits={detailsRail.limits} onChange={detailsRail.setWidth} onReset={detailsRail.reset} onCommit={detailsRail.commit} />
+          <IconButton size="sm" variant="quiet" className="details-rail-collapse" label="Collapse details panel" icon={<IconChevronRight />}
+            aria-expanded aria-controls="details-column" onClick={() => collapseDetails(true)} />
+        </div>}
+        {/* Issue 596: a finding or proposal selected while the column is folded is named on the strip, under "Details". */}
+        {detailsCollapsed && <button type="button" className="details-rail-expand" aria-label="Expand details panel"
+          title={stripSelection ? `Expand details panel (selected: ${stripSelection})` : "Expand details panel"}
+          aria-describedby={stripSelection ? "details-strip-selection" : undefined}
+          aria-expanded={false} aria-controls="details-column" onClick={() => collapseDetails(false)}>
+          <IconChevronLeft /><span className="details-rail-strip-label" aria-hidden="true">Details</span>
+          {stripSelection && <span id="details-strip-selection" className="details-rail-strip-selection">
+            <span className="visually-hidden">Selected: </span>{stripSelection}</span>}</button>}
         {/* Right: Annotation & Search Panel + Review Actions */}
-        <div className="inspector-pane density-compact" ref={inspectorRef}>
+        <div className="inspector-pane density-compact" id="details-column" ref={inspectorRef}>
           {/* A low window with the tree open (issue 521): the finding in one line, and the way back to the whole panel. */}
           {findingBarShown && treeWalkSubject && <div className="finding-bar" role="group" aria-label="Finding">
             <p className="finding-bar__summary">
@@ -4515,15 +4741,18 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
               await flushAnnotationNotes();
               if(unsavedAnnotationNotes().length) return;
               await resolveReanchor(selectedReanchorItem,"recreated",selectedAnnotation.annotation.annotation_id);
+              afterReanchorResolved(selectedReanchorItem);
             })().catch(reportError);}}>Complete text-change review</Button>
           </InlineMessage>}
           {selectedSource ? (
             <section className="detail-pane" aria-label="Reference details">
               <ProposalSource source={selectedSource} />
               <div className="detail-section">
-                <h2><TermName termId={selectedSource.annotation.term_id} label={termLabel(selectedSource.annotation.layer_id, selectedSource.annotation.term_id)} /></h2>
-                {selectedSource.annotation.term_id && <Button type="button" variant="secondary" size="sm" className="annotation-tree-button"
-                  title="Show this term in the ontology tree, only to look: broader and narrower terms" onClick={handleShowInTree}>Show in tree</Button>}
+                <div className="term-heading-row">
+                  <h2><TermName termId={selectedSource.annotation.term_id} label={termLabel(selectedSource.annotation.layer_id, selectedSource.annotation.term_id)} /></h2>
+                  {selectedSource.annotation.term_id && <IconButton variant="quiet" size="sm" className="annotation-tree-button" label="Show in tree" icon={<IconTree />}
+                    title="Show in tree, only to look: broader and narrower terms" onClick={handleShowInTree} />}
+                </div>
                 <p>{view.layers?.find(l => l.layer_id === selectedSource.annotation.layer_id)?.label}, Read-only</p>
                 <p>
                   <AiBadge provenance={selectedSource.annotation.provenance} source={selectedSource} />{" "}
@@ -4580,10 +4809,10 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                 {pendingIsMarkedSpan
                   ? <>
                     <p className="pending-quote">“{quoteSegments(view.document.text, pendingAnnotation.segments)}”<CopyTextButton text={passageRef.current} onAnnounce={announceCarried} /></p>
-                    <p className="form-hint">Adjust the marked text with its edge handles, or mark new text to replace it.</p>
+                    <DismissibleHint id="adjust-mark">Adjust the marked text with its edge handles, or mark new text to replace it.</DismissibleHint>
                   </>
                   : <p>
-                    {pendingAnnotation.carriedInput ? "Save this finding with the original term and values. Then check it and mark it as checked." : pendingAnnotation.reanchorItem ? "Save this finding, check its evidence and values, then complete the text-change review." : "Select a term from the ontology for the new finding."}
+                    {pendingAnnotation.carriedInput ? "Save this finding with the original term and values. Then check it and mark it as checked." : pendingAnnotation.reanchorItem ? (valuesToCheck(pendingAnnotation.reanchorItem) ? "Save this finding, confirm its values, then complete the text-change review." : "Save this finding with the original term and values; this completes its text-change review.") : "Select a term from the ontology for the new finding."}
                   </p>}
                 {pendingAnnotation.reanchorItem && <>
                   <p><TermName termId={savedPendingReanchor?.annotation.term_id ?? pendingAnnotation.reanchorItem.term_id} label={termLabel(pendingAnnotation.layerId,savedPendingReanchor?.annotation.term_id ?? pendingAnnotation.reanchorItem.term_id)} />, {pendingAnnotation.layerId}</p>
@@ -4613,7 +4842,7 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                   onPickModifier={pendingIsMarkedSpan && modifierLayerIds.has(pendingAnnotation.layerId) ? startAttach : undefined}
                   modifierFilter={modifierLayerIds.has(pendingAnnotation.layerId)}
                   onSelectCandidate={(candidate, searchId) => { void choosePendingTerm(candidate.term_id, searchId, candidate.label ?? undefined); }}
-                  onShowInTree={candidate => handleShowHitInTree(candidate.term_id)} />}
+                  onShowInTree={candidate => handleShowHitInTree(candidate.term_id)} treeShown={treeShown} />}
                 {!pendingIsMarkedSpan && <Button type="button" variant="secondary" disabled={queueState === "saving"} onClick={cancelPending}>Cancel</Button>}
               </div>
             </section>
@@ -4714,10 +4943,11 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
                 <p className="field-hint">{changes.length ? `Changes: ${changes.join("; ")}.` : "No changes yet. Edit the term, values or text below; the proposal counts as replaced once the copy differs."}</p>
                 {/* Issue 257: an unchanged copy goes on Done; Discard copy is the way back that drops the copy. */}
                 <div className="review-actions__row">
-                  <Button type="button" variant="primary" size="sm" onClick={() => {
+                  {/* Issue 612: read-only, nothing is done here; a plain way back, not the primary action. */}
+                  <Button type="button" variant={readOnly ? "secondary" : "primary"} size="sm" onClick={() => {
                     if (readOnly) { selectProposal(replaced); return; }
                     void discardCopy(replaced, { from: "copy", onlyUnchanged: true });
-                  }}>Done, back to the proposal</Button>
+                  }}>{readOnly ? "Back to the proposal" : "Done, back to the proposal"}</Button>
                   {!readOnly && <Button type="button" size="sm" onClick={() => { void discardCopy(replaced, { from: "copy" }); }}>
                     <IconUndo />Discard copy
                   </Button>}
@@ -4869,8 +5099,9 @@ export const CaseScreen: React.FC<CaseScreenProps> = ({
           />
         )}
         {/* The divider drawn above the tree sets its height (three columns only, editor.css); after it in the
-            focus order, as the findings column's divider follows that column. */}
-        {treeShown && !panelGivenToTree && (
+            focus order, as the findings column's divider follows that column. A folded column has no tree to size
+            (issue 589): the divider is not rendered, so it neither covers the strip's Expand nor takes a Tab stop. */}
+        {treeShown && !panelGivenToTree && !detailsCollapsed && (
           <SidebarResizer orientation="horizontal" side="start" width={treeHeight.value} limits={treeHeight.limits} controls="ontology-tree"
             onChange={treeHeight.setHeight} onReset={treeHeight.reset} onCommit={treeHeight.commit}
             label="Resize ontology tree" hint="Resize the ontology tree (focus the divider)" measure={treeHeight.measure} />

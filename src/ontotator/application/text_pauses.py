@@ -58,6 +58,43 @@ SKIP_REASONS: dict[str, str] = {
 }
 
 
+def _notify_released(
+    conn: Connection,
+    project_id: int,
+    assignment_ids: list[int],
+    actor_id: int | None,
+    now: datetime,
+) -> None:
+    from sqlalchemy import select
+
+    from ontotator.application.notifications import notify
+    from ontotator.assignments.eligibility import waiting_annotation_tasks
+    from ontotator.storage.tables import AssignmentRow
+
+    # Issue 620: an annotation that waits for the translation review does not
+    # open with the release, so its owner is not told it was released.
+    opening = set(assignment_ids) - waiting_annotation_tasks(
+        conn, project_id, assignment_ids
+    )
+    if not opening:
+        return
+    owners = conn.execute(
+        select(AssignmentRow.id, AssignmentRow.user_id)
+        .where(AssignmentRow.id.in_(opening))
+        .order_by(AssignmentRow.id)
+    )
+    for aid, owner in owners:
+        notify(
+            conn,
+            owner,
+            project_id,
+            "task_released",
+            actor_id=actor_id,
+            assignment_id=aid,
+            at=now,
+        )
+
+
 class TextPauseService:
     def __init__(self, db: Database, actor: Actor):
         self.db, self.actor = db, actor
@@ -115,6 +152,19 @@ class TextPauseService:
                     )
                 else:
                     write_release(conn, pid, case_id, language)
+                    # Issue 557: each task that can be worked on again (not one
+                    # a problem report still pauses or that waits, issue 620).
+                    _notify_released(
+                        conn,
+                        pid,
+                        [
+                            t["assignment_id"]
+                            for t in change["tasks"]
+                            if not t["paused_by_report"]
+                        ],
+                        self.actor.user_id,
+                        now,
+                    )
                     details["paused_reason"] = change["pause"]["reason"]
                     details["still_paused_assignment_ids"] = [
                         t["assignment_id"]

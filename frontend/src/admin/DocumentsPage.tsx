@@ -33,7 +33,7 @@ import { DocumentsTable, tableRows, type ColumnSort, type HeaderSort, type Table
 import { consolidationStartedToast, panelStep } from "../documents/finalPanelText";
 import { finalChangedText, finalUndoAction } from "../documents/finalUndo";
 import { leadSteps, rowActionLabel, stepBlockedReason } from "../documents/nextStepLabels";
-import { TranslationCorrectionAction } from "../variants/TranslationCorrectionAction";
+import { AskReviewerDialog } from "../variants/TranslationCorrectionAction";
 import { DecisionBlock } from "../documents/FinalPanel";
 import { StageActions, type StageActionsProps } from "../documents/StageActions";
 import { WithdrawFinalDialog } from "../documents/WithdrawFinalDialog";
@@ -44,13 +44,13 @@ import { HandleTextChangeDialog } from "../documents/HandleTextChangeDialog";
 import { CarryDialog, carrySourceOfFinal, carrySourceOfStep, type CarrySource } from "../documents/CarryDialog";
 import { PlanChips, PlanRowNotice, usePlanSaves } from "../documents/PlanChips";
 import { InlineConfirm } from "../ui/InlineConfirm";
-import { useShortcut, useShortcutHint } from "../ui/shortcuts";
+import { useShortcutHint } from "../ui/shortcuts";
 import { ResolveTranslation } from "../documents/ResolveTranslation";
 import { SelectByIdsDialog } from "../documents/SelectByIdsDialog";
 import { SelectionBar } from "../documents/SelectionBar";
 import { documentsGroupId, documentsRowId, isPlainClick, type DocumentsRowPart, type OpenTextCard, RouteLink, rowKeyOf, rowName } from "../documents/RowCells";
 import type { TextVersionsTools } from "../documents/TextVersions";
-import { AcceptVersionDialog, CorrectVersionDialog } from "../documents/VersionDialogs";
+import { AcceptVersionDialog, CorrectVersionDialog, EditTranslationDialog } from "../documents/VersionDialogs";
 import { EditorialCorrectionDialog } from "../documents/EditorialCorrectionDialog";
 import { UploadVersionDialog } from "../documents/UploadVersionDialog";
 import { workText } from "../documents/labels";
@@ -129,8 +129,8 @@ const rowElement = (key: string, part: DocumentsRowPart): HTMLElement | null =>
   document.getElementById(documentsRowId(caseOfTextKey(key), languageOfTextKey(key), part));
 
 /**
- * Resolve options of a row: rule 4 "Resolve…" or rule 4a "Assign review or accept…". They render inline
- * under the row (documents overview Change 13); focus goes to their heading (F5).
+ * Resolve options of a row: rule 4 "Resolve…" or rule 4a "Assign review or accept…". They open in a dialog
+ * (issue 554; before, inline under the row, documents overview Change 13); focus goes to the primary action.
  */
 interface ResolveOptions { rowKey: string; mode: "resolve" | "not_accepted" }
 
@@ -393,7 +393,20 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   /** The row as the page shows it now (after a refused withdrawal the reload brings the new revision). */
   const withdrawRow = withdrawFor ? pageRows.find(entry => rowKeyOf(entry) === rowKeyOf(withdrawFor)) ?? withdrawFor : null;
   // Issues 341 and 453: the lead's actions on one version row (Correct it myself…, Accept this version…, Fix typos…, Upload a corrected text…).
-  const [versionAction, setVersionAction] = useState<{ kind: "correct" | "accept" | "upload" | "editorial"; row: DocumentRowView; version: DocumentVersionView } | null>(null);
+  const [versionAction, setVersionAction] = useState<{ kind: "edit" | "correct" | "accept" | "upload" | "editorial"; row: DocumentRowView; version: DocumentVersionView } | null>(null);
+  /** Issue 555: "Edit the translation…" opens the choice, then the dialog of the chosen way; focus goes back to the button. */
+  const editOpener = useRef<HTMLElement | null>(null);
+  const versionReturnFocus = () => (editOpener.current?.isConnected ? editOpener.current : null);
+  /**
+   * Issue 613: after Fix typos saves, the refreshed card no longer holds the button that opened it. Focus goes to the
+   * card's next step (for example Assign annotation…), else to the card, instead of falling to the page.
+   */
+  const focusCardNext = () => window.requestAnimationFrame(() => {
+    const card = document.querySelector<HTMLElement>(".ui-dialog.text-card");
+    const active = document.activeElement;
+    if (!card || (active && active !== document.body && card.contains(active))) return;
+    (card.querySelector<HTMLElement>(".text-card-steps :is(button, a[href])") ?? card).focus();
+  });
   const textVersionTools = useMemo<TextVersionsTools | undefined>(() => {
     if (!inventory) return undefined;
     const variants = new Map<string, VariantSummary>(inventory.cases.flatMap(item => item.variants).map(variant => [variant.document_id, variant]));
@@ -407,10 +420,14 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       onShowTranslationReviews: setReviewDocument,
       onRequestCorrection: (row, variant) => setCorrectionFor({ row, variant }),
       ...(canOverrideTranslationStatus ? {
-        onCorrectTranslation: (row: DocumentRowView, version: DocumentVersionView) => setVersionAction({ kind: "correct", row, version }),
+        onCorrectTranslation: (row: DocumentRowView, version: DocumentVersionView) => { editOpener.current = null; setVersionAction({ kind: "correct", row, version }); },
         onAcceptVersion: (row: DocumentRowView, version: DocumentVersionView) => setVersionAction({ kind: "accept", row, version }),
         onUploadVersion: (row: DocumentRowView, version: DocumentVersionView) => setVersionAction({ kind: "upload", row, version }),
-        onEditorialCorrection: (row: DocumentRowView, version: DocumentVersionView) => setVersionAction({ kind: "editorial", row, version }),
+        onEditorialCorrection: (row: DocumentRowView, version: DocumentVersionView) => { editOpener.current = null; setVersionAction({ kind: "editorial", row, version }); },
+        onEditTranslation: (row: DocumentRowView, version: DocumentVersionView) => {
+          editOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          setVersionAction({ kind: "edit", row, version });
+        },
       } : {}),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshAll only uses rows.reload and state setters
@@ -604,8 +621,6 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   // they hold only the row key and would open again once the row is back on the page.
   const optionsView = JSON.stringify([requestIdentity, showSelected]);
   useEffect(() => { setResolveOptions(null); }, [optionsView]);
-  /** The rendered Resolve options under the row. */
-  const panelBox = useRef<HTMLDivElement>(null);
   const openPanel = (row: DocumentRowView, mode: ResolveOptions["mode"]) => {
     setResolveOptions({ rowKey: rowKeyOf(row), mode });
   };
@@ -767,12 +782,6 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     canChangeFinal: row => row.final != null && !panelStep(row) && decisionKey.current !== rowKeyOf(row),
     onWithdrawFinal: row => setWithdrawFor(row),
   };
-  // Escape inside the options closes them; a discard confirmation inside handles its own Escape first (registered later).
-  useShortcut("Escape", event => {
-    const scope = panelBox.current;
-    if (!resolveOptions || !scope || !(event.target instanceof Node) || !scope.contains(event.target)) return false;
-    closePanel(resolveOptions.rowKey);
-  }, { allowInInputs: true, enabled: resolveOptions != null });
 
   // "Ask a reviewer to correct…" of an accepted version (the card's versions, the cards' stage popover).
   /** The accepted newest translation a correction can be requested for (Text versions offers the same). */
@@ -782,8 +791,7 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     return newest ? textVersionTools.variants.get(newest.document_id) ?? null : null;
   };
   /** The reviewer was asked: the dialog's one button then reads "Close" ("Cancel" before, as in the neighbour dialogs). */
-  const [correctionDone, setCorrectionDone] = useState(false);
-  const closeCorrection = () => { setCorrectionFor(null); setCorrectionDone(false); reloadAfterAction(); };
+  const closeCorrection = () => { setCorrectionFor(null); reloadAfterAction(); };
 
   const [planFor, setPlanFor] = useState<DocumentRowView | null>(null);
   // A status-column sort of the loaded page (the server sorts by Text and Last activity only).
@@ -839,11 +847,13 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
   const planDialog = planFor ? <TextPlanDialog row={planFor} groupRevision={groupOf(planFor.case_id)?.plan_revision ?? 1} saves={planSaves}
     onClose={() => setPlanFor(null)} /> : null;
 
+  // Issue 554: Resolve… opens a dialog (it was a panel under the row); Escape and Close cancel it.
+  const resolveRow = resolveOptions ? pageRows.find(entry => rowKeyOf(entry) === resolveOptions.rowKey) ?? null : null;
   const resolvePanel = (row: DocumentRowView, panel: ResolveOptions): JSX.Element => {
     const key = rowKeyOf(row);
     const groupRevision = groupOf(row.case_id)?.plan_revision ?? 1;
-    return <div ref={panelBox}>
-      <ResolveTranslation key={panel.mode} mode={panel.mode} row={row} projectKey={projectKey} headingLevel={narrow ? 5 : 3}
+    return <ResolveTranslation key={`${key}-${panel.mode}`} mode={panel.mode} row={row} projectKey={projectKey}
+        returnFocus={() => rowElement(key, "action") ?? rowElement(key, "header")}
         revision={planSaves.revisionOf(row.case_id, groupRevision)}
         onAssignReview={() => { setResolveOptions(null); void onAssign(row, "translation_review"); }}
         onNavigate={route => onNavigate(route)}
@@ -855,21 +865,18 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
         }}
         onChanged={(caseId, revision) => { planSaves.noteRevision(caseId, revision); reloadAfterAction(); }}
         onAnnounce={announce}
-        onCancel={() => closePanel(key)} />
-    </div>;
+        onCancel={() => closePanel(key)} />;
   };
 
   const renderRowNotice = (row: DocumentRowView): ReactNode | null => {
     const key = rowKeyOf(row);
-    const panel = resolveOptions?.rowKey === key ? resolveOptions : null;
     const notice = rowNotice(row);
     // The open text card shows its row's plan notice next to the plan chips (the card is modal).
     const planNotice = key !== panelKey && planSaves.noticeOf(row);
-    if (!panel && !notice && !planNotice) return null;
+    if (!notice && !planNotice) return null;
     return <>
       {notice && <p className="documents-row-notice">{notice}</p>}
       {planNotice && <PlanRowNotice row={row} saves={planSaves} />}
-      {panel && resolvePanel(row, panel)}
     </>;
   };
 
@@ -979,12 +986,11 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
     {assignDialog && <AssignWorkDialog {...assignDialog} />}
     {textChangeDialog}
     {planDialog}
-    {correctionFor && textVersionTools && <Dialog open title={`Ask a reviewer to correct, ${rowName(correctionFor.row)}`} size="md"
-      onClose={closeCorrection} footer={<Button onClick={closeCorrection}>{correctionDone ? "Close" : "Cancel"}</Button>}
-      returnFocus={() => rowElement(rowKeyOf(correctionFor.row), "action") ?? rowElement(rowKeyOf(correctionFor.row), "header")}>
-      <TranslationCorrectionAction projectKey={projectKey} variant={correctionFor.variant} username={textVersionTools.username}
-        requiredLanguages={textVersionTools.requiredLanguages(correctionFor.variant.document_id)} defaultOpen inDialog onAssigned={() => setCorrectionDone(true)} />
-    </Dialog>}
+    {resolveOptions && resolveRow && resolvePanel(resolveRow, resolveOptions)}
+    {correctionFor && textVersionTools && <AskReviewerDialog title={`Ask a reviewer to correct, ${rowName(correctionFor.row)}`}
+      onClose={closeCorrection} returnFocus={() => rowElement(rowKeyOf(correctionFor.row), "action") ?? rowElement(rowKeyOf(correctionFor.row), "header")}
+      projectKey={projectKey} variant={correctionFor.variant} username={textVersionTools.username}
+      requiredLanguages={textVersionTools.requiredLanguages(correctionFor.variant.document_id)} />}
     {withdrawFor && withdrawRow && <WithdrawFinalDialog projectKey={projectKey} row={withdrawRow} onCancel={() => setWithdrawFor(null)}
       onStale={reloadAfterAction}
       onWithdrawn={() => {
@@ -993,8 +999,11 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
         showToast({ message: `Final result of ${rowName(withdrawFor)} withdrawn.` });
         reloadAfterAction();
       }} />}
+    {versionAction?.kind === "edit" && <EditTranslationDialog row={versionAction.row} version={versionAction.version}
+      onClose={() => setVersionAction(null)} returnFocus={versionReturnFocus}
+      onChoose={kind => setVersionAction({ ...versionAction, kind: kind === "typos" ? "editorial" : "correct" })} />}
     {versionAction?.kind === "correct" && <CorrectVersionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}
-      onNavigate={route => onNavigate(route)} onClose={() => setVersionAction(null)} />}
+      onNavigate={route => onNavigate(route)} onClose={() => setVersionAction(null)} returnFocus={versionReturnFocus} />}
     {versionAction?.kind === "accept" && <AcceptVersionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}
       onClose={() => setVersionAction(null)}
       onAccepted={message => { setVersionAction(null); void refreshAll().then(() => showToast({ message })); }} />}
@@ -1002,8 +1011,8 @@ function LeadDocuments({ projectKey, query: route, onNavigate, canOverrideTransl
       onClose={() => setVersionAction(null)}
       onUploaded={message => { setVersionAction(null); void refreshAll().then(() => showToast({ message })); }} />}
     {versionAction?.kind === "editorial" && <EditorialCorrectionDialog row={versionAction.row} version={versionAction.version} projectKey={projectKey}
-      onClose={() => setVersionAction(null)}
-      onCorrected={message => { setVersionAction(null); void refreshAll().then(() => showToast({ message })); }} />}
+      onClose={() => setVersionAction(null)} returnFocus={versionReturnFocus}
+      onCorrected={message => { setVersionAction(null); void refreshAll().then(() => { showToast({ message }); focusCardNext(); }); }} />}
     {idsDialogOpen && <SelectByIdsDialog projectKey={projectKey} current={selection.cases} filters={filters} sort={request.sort ?? "case"} activeOnly={!notInPlanShown} onClose={() => setIdsDialogOpen(false)} onSelect={selectByIds} />}
   </section>;
 }

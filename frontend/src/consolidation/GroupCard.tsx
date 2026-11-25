@@ -27,6 +27,7 @@ import { crossLinks, setText, type ModifierView } from "./modifierSets";
 import { ResultLine } from "./ResultLine";
 import { TermPicker, useTermSearch } from "./TermPicker";
 import type { GroupOutcome } from "./useConsolidation";
+import { useTermIdDisplay } from "../editor/termIds";
 
 export interface GroupCardProps {
   group: ConsolidationGroupView;
@@ -149,6 +150,7 @@ function EditValues({ group, workspace, text, busy, onKeep, onCancel }: { group:
 }
 
 export function GroupCard(props: GroupCardProps): JSX.Element {
+  const showTermId = useTermIdDisplay();
   const { group, people, text, expanded, readOnly, busy, outcome, narrow, workspace } = props;
   const [otherTerm, setOtherTerm] = useState<OtherTerm | null>(null);
   const [choices, setChoices] = useState<Choices>({});
@@ -304,7 +306,7 @@ export function GroupCard(props: GroupCardProps): JSX.Element {
           setPicking(false);
           if (!needsTerm(group)) {
             resolve({ action: "choose", choice: { term_id: candidate.term_id, span_from_input_id: group.keep_input_id, axes: {} } },
-              `${candidate.label} (${candidate.term_id})`);
+              `${candidate.label} (${showTermId(candidate.term_id)})`);
             return;
           }
           // Another term replaces the members' terms (staged); the other conflicting fields still need their choice.

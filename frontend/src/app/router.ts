@@ -151,6 +151,8 @@ export type Route =
   | { name: "projectExport"; key: string }
   /** The lead's list of translation reviews (issue 483); filters, order and page live in the address. */
   | ({ name: "projectTranslationReviews"; key: string } & TranslationReviewsQuery)
+  /** The lead's questions of a project (issue 553, prototype); `question` shows that one (a notification, issue 557). */
+  | { name: "projectQuestions"; key: string; question?: string }
   /** Read-only guidelines page; without `version` the version in force. */
   | { name: "projectGuidelines"; key: string; version?: number }
   | { name: "projectProblemReport"; key: string; reportId: string; action?: "resume"; section?: "decide"; documents?: ProjectDocumentsQuery }
@@ -264,6 +266,11 @@ export function parseRoute(hash: string): Route {
       }
       return { name: "projectTranslationReviews", key: decodeURIComponent(reviews[1]), ...query };
     }
+    const questions = /^#\/projects\/([^/]+)\/questions$/.exec(path);
+    if (questions) {
+      const question = params.get("question");
+      return { name: "projectQuestions", key: decodeURIComponent(questions[1]), ...(question ? { question } : {}) };
+    }
     const project = /^#\/projects\/([^/]+)\/(documents|progress|export)$/.exec(path);
     if (!project) return notFound;
     const key = decodeURIComponent(project[1]);
@@ -314,6 +321,7 @@ export function routeHref(route: Route): string {
     case "projectExport": return `#/projects/${encodeURIComponent(route.key)}/export`;
     case "projectTranslationReviews": return `#/projects/${encodeURIComponent(route.key)}/translation-reviews${querySuffix(
       TRANSLATION_REVIEW_FIELDS.map(field => [field, route[field]]))}`;
+    case "projectQuestions": return `#/projects/${encodeURIComponent(route.key)}/questions${querySuffix([["question", route.question]])}`;
     case "projectGuidelines": return `#/projects/${encodeURIComponent(route.key)}/guidelines${route.version === undefined ? "" : `/v${route.version}`}`;
     case "projectProblemReport": return `#/projects/${encodeURIComponent(route.key)}/problem-reports/${encodeURIComponent(route.reportId)}${querySuffix([
       ["action", route.action], ["section", route.section], ...documentsEntries(route.documents, "documents_"),

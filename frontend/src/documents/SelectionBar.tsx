@@ -33,7 +33,7 @@ import { finalAppliedText, finalUnavailableReason, FINAL_ACTION_LABELS, taskUndo
 import { BulkModeDialog } from "./BulkModeDialog";
 import { modeAppliedText, modeUnavailableReason, MODE_ACTION_LABEL } from "./bulkModeModel";
 import { BulkPauseDialog } from "./BulkPauseDialog";
-import { pauseAppliedText, pauseUnavailableReason, PAUSE_ACTION_LABELS, type PauseAction } from "./bulkPauseModel";
+import { pauseActionLabel, pauseAppliedText, pauseUnavailableReason, type PauseAction } from "./bulkPauseModel";
 import { BulkTaskDialog } from "./BulkTaskDialog";
 import { PLAN_CHANGED_MESSAGE, UNDO_WITHDRAWN_NOTE, undoneToast, WITHDRAW_CHECKBOX, withdrawnSummary } from "./PlanChips";
 import { PlanDialog } from "./PlanDialog";
@@ -343,7 +343,7 @@ export function SelectionBar({
   const visible = keys.size >= MIN_TEXTS || undoState !== null;
   useFloatingBar(section, visible);
   if (!visible && !plan && !bulk && !finalAction && !modeChange && !pauseAction) return null;
-  const modeReason = modeUnavailableReason([reachable?.scratch, reachable?.proposals]);
+  const modeReason = modeUnavailableReason([reachable?.scratch, reachable?.proposals], rows.length);
   const withdrawing = undoState?.kind === "conflict" && undoState.consequences.withdrawn.length > 0;
 
   return <>
@@ -364,7 +364,7 @@ export function SelectionBar({
                 return { id: action, label: ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setBulk(action) };
               }),
               ...(["accept", "change"] as const).map(action => {
-                const reason = finalUnavailableReason(reachable?.[action]);
+                const reason = finalUnavailableReason(reachable?.[action], rows.length);
                 return { id: action, label: FINAL_ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setFinalAction(action) };
               }),
               ...(["start_round"] as const).map(action => {
@@ -373,8 +373,8 @@ export function SelectionBar({
               }),
               { id: "change_mode", label: MODE_ACTION_LABEL, disabled: modeReason !== null, ...(modeReason ? { description: modeReason } : {}), onSelect: () => setModeChange(true) },
               ...(["pause", "release"] as const).map(action => {
-                const reason = pauseUnavailableReason(action, reachable?.[action]);
-                return { id: `${action}_texts`, label: PAUSE_ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setPauseAction(action) };
+                const reason = pauseUnavailableReason(action, reachable?.[action], rows.length);
+                return { id: `${action}_texts`, label: pauseActionLabel(action, rows.length), disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setPauseAction(action) };
               }),
             ]} />
           <Button ref={frontButton} aria-expanded={front} onClick={() => setFront(value => !value)}>{MOVE_TO_FRONT}</Button>

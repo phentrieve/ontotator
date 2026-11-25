@@ -537,6 +537,7 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
                     "EDITORIAL_CORRECTION_NOT_AVAILABLE": 409,
                     "QUERY_DECISION_NOT_AVAILABLE": 409,
                     "CORRECTION_REASON_NOT_AVAILABLE": 409,
+                    "QUESTION_ANSWER_NOT_AVAILABLE": 409,
                     "LANGUAGE_CONFIRMATION_REQUIRED": 409,
                     "REASSIGN_CONFIRMATION_REQUIRED": 409,
                     "ADJUDICATOR_IS_ANNOTATOR": 409,
@@ -633,6 +634,9 @@ def create_app(config: AppConfig | None = None, *, expose_docs: bool = True) -> 
     )
 
     app.include_router(technical_report_router)
+    from ontotator.api.notification_routes import router as notification_router
+
+    app.include_router(notification_router)
     from ontotator.api.translation_review_routes import (
         router as translation_review_router,
     )

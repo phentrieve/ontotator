@@ -1,11 +1,13 @@
 """Frozen review inputs, authorized pending context and exact reviewer resolutions."""
 
+from dataclasses import asdict
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
 from ontotator.domain.annotations import AnnotationRef
 from ontotator.domain.documents import EvidenceRef
+from ontotator.domain.reanchor import TextSpan, TextWindow, relocate
 
 
 class TextWindowView(BaseModel):
@@ -84,6 +86,15 @@ class ReanchorItem(BaseModel):
     old_context: TextWindowView
     new_context: TextWindowView
     diff: list[WindowOpcodeView]
+    # Computed for the workspace (#633), never stored: where the old words
+    # occur unchanged in the current text (each the mention's segments there),
+    # else the new wording that replaced them.
+    suggestions: list[list[TextWindowView]] = Field(
+        default_factory=list, exclude_if=lambda value: not value
+    )
+    changed_at: TextWindowView | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
     @computed_field
     def old_segments(self) -> list[TextWindowView]:
@@ -120,3 +131,38 @@ class ReanchorResolution(BaseModel):
         if self.reason is not None:
             self.reason = self.reason.strip()
         return self
+
+
+def with_relocation(item: ReanchorItem, text: str) -> ReanchorItem:
+    """The item with its suggested locations in ``text`` (the current text, #633).
+
+    Only an item of one mention whose evidence text changed is relocated; the
+    current context then shows where the old words are, not the end of a
+    reordered block. Anything else stays as stored.
+    """
+    if not item.reason.startswith("changed_") or len(item.old_mentions) != 1:
+        return item
+    new = item.new_context
+    if new.end > len(text) or text[new.start : new.end] != new.text:
+        return item
+    found = relocate(
+        [TextSpan(s.start, s.end, s.text) for s in item.old_mentions[0].segments],
+        TextWindow(item.old_context.start, item.old_context.end, item.old_context.text),
+        TextWindow(new.start, new.end, new.text),
+        text,
+    )
+    if found.new_context is None:
+        return item
+    return item.model_copy(
+        update={
+            "suggestions": [
+                [TextWindowView(**asdict(s)) for s in place]
+                for place in found.suggestions
+            ],
+            "changed_at": TextWindowView(**asdict(found.changed_at))
+            if found.changed_at
+            else None,
+            "new_context": TextWindowView(**asdict(found.new_context)),
+            "diff": [WindowOpcodeView(**asdict(op)) for op in found.diff],
+        }
+    )

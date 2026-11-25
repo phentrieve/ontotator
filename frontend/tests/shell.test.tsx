@@ -10,6 +10,7 @@ import { NotFound } from "../src/app/NotFound";
 import { routeHref } from "../src/app/router";
 import { notifyDocumentsChanged } from "../src/documents/documentsEvents";
 import { notifyTasksChanged } from "../src/tasks/tasksEvents";
+import { notifyQuestionsChanged } from "../src/questions/questionsEvents";
 import { DOCUMENTS_SUMMARY_REFRESH_MS } from "../src/documents/useDocumentsSummary";
 
 const user: CurrentUser = { username: "alex", display_name: "Alex", pseudonym: "a1", is_system_admin: false, csrf_token: "test" };
@@ -100,8 +101,20 @@ describe("role-based shell", () => {
 
   it("shows a lead the pages of the current project under the two entries, and no gear", () => {
     render(<Shell {...props({ projects: [project("led", true)], route: { name: "projectDocuments", key: "led" } })} />);
-    expect(sidebar()).toEqual(["My tasks", "Projects", "Documents", "Progress", "Settings", "Export"]);
+    expect(sidebar()).toEqual(["My tasks", "Projects", "Documents", "Questions", "Progress", "Settings", "Export"]);
     expect(administrationGear()).toBeNull();
+  });
+
+  // Issue 590: the count follows an answer on the Questions page (and window focus), not only navigation.
+  it("reloads Questions (n) after an answer and on window focus", async () => {
+    const open = vi.spyOn(api, "listQuestions").mockResolvedValueOnce([{}, {}] as never).mockResolvedValueOnce([{}] as never).mockResolvedValue([] as never);
+    render(<Shell {...props({ projects: [project("led", true)], route: { name: "projectDocuments", key: "led" } })} />);
+    expect(await screen.findByRole("link", { name: "Questions, 2 open" })).toBeDefined();
+    act(() => { notifyQuestionsChanged(); });
+    expect(await screen.findByRole("link", { name: "Questions, 1 open" })).toBeDefined();
+    act(() => { window.dispatchEvent(new Event("focus")); });
+    expect(await screen.findByRole("link", { name: "Questions" })).toBeDefined();
+    expect(open).toHaveBeenCalledWith("led", { state: "open" });
   });
 
   it("gives an administrator the gear and no administration entry in the work sidebar", () => {
@@ -437,11 +450,11 @@ describe("shell identity and task count", () => {
     expect(identity.querySelector(".cell-secondary")).toBeNull();
   });
 
-  it("names an annotator on a translation review a Translation reviewer", () => {
+  it("names the same role on a translation review and adds the task (issue 611)", () => {
     const route = { name: "task", assignmentId: 42 } as const;
     const { rerender } = render(<Shell {...props({ projects: [project("p", false)], route, taskProject: "p", taskKind: "translation_review" })} />);
     const identity = screen.getByTestId("current-user");
-    expect(identity.querySelector(".cell-secondary")?.textContent).toBe("Translation reviewer");
+    expect(identity.querySelector(".cell-secondary")?.textContent).toBe("Annotator · translation review");
     rerender(<Shell {...props({ projects: [project("p", false)], route, taskProject: "p", taskKind: "annotate" })} />);
     expect(identity.querySelector(".cell-secondary")?.textContent).toBe("Annotator");
   });

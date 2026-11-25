@@ -251,7 +251,9 @@ def discard_export_files(
 
 def operator_access(actor: Actor) -> Access:
     """The rights of the operator on the command line: a system admin's (Q5)."""
-    return Access(user_id=0, pseudonym=actor.label, is_system_admin=True)
+    return Access(
+        user_id=0, pseudonym=actor.label, is_system_admin=True, system_operator=True
+    )
 
 
 @dataclass(frozen=True)

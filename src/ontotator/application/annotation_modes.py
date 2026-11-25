@@ -11,7 +11,7 @@ from ontotator.application.text_targets import text_documents, text_row
 from ontotator.domain.annotation_modes import AnnotationMode, TextMode, text_mode
 from ontotator.storage.live_submissions import live_submission, live_submission_ref
 from ontotator.storage.plan_tables import WorkPlanFlagsRow
-from ontotator.storage.proposal_queries import newest_proposal_refs
+from ontotator.storage.proposal_queries import has_review_items, newest_proposal_refs
 from ontotator.storage.tables import (
     AssignmentRow,
     DocumentRow,
@@ -150,4 +150,5 @@ def load_text_mode(conn: Connection, project_id: int, document_id: str) -> TextM
         plan_override=override,
         proposal_count=len(newest_proposal_refs(conn, project_id, document_id)),
         work_modes=work_modes(conn, project_id, text_documents(conn, project_id, row)),
+        review_items=has_review_items(conn, project_id, document_id),
     )

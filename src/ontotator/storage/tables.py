@@ -146,6 +146,14 @@ class ProjectRow(Base):
     record_working_time: Mapped[bool] = mapped_column(
         Boolean, server_default=text("false")
     )
+    # Show term ids without the ontology prefix (`N18.1`, not `ICD10CM:N18.1`).
+    hide_term_id_prefix: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false")
+    )
+    # Ontology id -> link template for its term codes (ontology/links.py).
+    term_link_templates: Mapped[dict[str, Any]] = mapped_column(
+        server_default=text("'{}'::jsonb")
+    )
     import_plan: Mapped[str] = mapped_column(
         server_default=text("'review_and_annotate_translations'")
     )
@@ -1083,6 +1091,7 @@ class UploadRow(Base):
 from ontotator.storage import final_tables as _final_tables  # noqa: E402,F401
 from ontotator.storage import guideline_tables as _guideline_tables  # noqa: E402,F401
 from ontotator.storage import mode_change_tables as _mode_tables  # noqa: E402,F401
+from ontotator.storage import notification_tables as _notices  # noqa: E402,F401
 from ontotator.storage import overview_tables as _overview_tables  # noqa: E402,F401
 from ontotator.storage import plan_tables as _plan_tables  # noqa: E402,F401
 from ontotator.storage import report_tables as _report_tables  # noqa: E402,F401

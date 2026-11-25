@@ -91,6 +91,9 @@ class WorkspaceView(BaseModel):
     # Layers whose pin has the T1 profile ``hpo-phenotype``: only there a
     # finding has modifiers.
     modifier_layer_ids: list[str] = Field(default_factory=list)
+    # The project shows term ids without the ontology prefix (display only).
+    # A factory default keeps the field optional in the generated types.
+    hide_term_id_prefix: bool = Field(default_factory=lambda: False)
 
 
 class WorkspaceService:
@@ -459,6 +462,7 @@ class WorkspaceService:
                 for layer, kinds in rules.creation_defaults.items()
             },
             annotation_policy_revision=rules.annotation_policy_revision,
+            hide_term_id_prefix=self.repo.hide_term_id_prefix(key.project_key),
             key=key,
             document=doc,
             draft=draft,

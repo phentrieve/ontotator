@@ -9,6 +9,7 @@ import { TermName } from "./TermName";
 import { Kbd } from "../ui/Kbd";
 import { sortByLabel } from "./modifiers";
 import "./modifiers.css";
+import { useTermIdDisplay } from "./termIds";
 
 /** The row as a target of the attach mode (E-a): its name, and whether it is the focused target. */
 export interface AttachTarget {
@@ -48,6 +49,7 @@ export function ModifierLine({ modifiers, layerId, termLabel }: {
   layerId: string;
   termLabel: (layer: string | undefined, term: string) => string | null;
 }) {
+  const showTermId = useTermIdDisplay();
   const sorted = sortByLabel(modifiers ?? [], id => {
     const label = termLabel(layerId, id);
     return label ? { label, role: "modifier", exclusiveClass: null } : undefined;
@@ -55,8 +57,8 @@ export function ModifierLine({ modifiers, layerId, termLabel }: {
   // Issue 525: each modifier with its term ID, as in the Modifiers section ("Severe · HP:0012828").
   return sorted.length > 0 ? <p className="mod-lines">Modifiers: {sorted.map((modifier, index) => {
     const label = termLabel(layerId, modifier.term_id);
-    return <span key={modifier.term_id}>{index > 0 && ", "}<b>{label ?? modifier.term_id}</b>
-      {label && <span className="mod-line-code"> · {modifier.term_id}</span>}</span>;
+    return <span key={modifier.term_id}>{index > 0 && ", "}<b>{label ?? showTermId(modifier.term_id)}</b>
+      {label && <span className="mod-line-code" title={modifier.term_id}> · {showTermId(modifier.term_id)}</span>}</span>;
   })}</p> : null;
 }
 

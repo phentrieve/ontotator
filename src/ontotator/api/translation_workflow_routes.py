@@ -70,6 +70,9 @@ class LeadCorrectionPreview(BaseModel):
     translation_status: str | None
     available: bool
     reason: str | None
+    # Issue 629: required languages missing from the lead's profile; start
+    # refuses with LANGUAGE_CONFIRMATION_REQUIRED unless they are confirmed.
+    missing_languages: list[str]
     reviewed_again: bool
     review_on: bool
     annotate_accepted_only: bool
@@ -214,8 +217,9 @@ class EditorialNumberChange(BaseModel):
 
 
 class EditorialFindings(BaseModel):
-    # Findings of the submitted annotations on the corrected version, and
-    # how many of them the text-change steps cannot place on the new text.
+    # Findings of the submitted annotations that stay on the corrected
+    # version (not of those that move by themselves, issue 575), and how
+    # many of them the text-change steps cannot place on the new text.
     submitted: int
     needs_check: int
 

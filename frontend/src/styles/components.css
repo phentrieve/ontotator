@@ -203,6 +203,16 @@ textarea.form-control {
   cursor: not-allowed;
 }
 
+/* A read-only field (a submitted finding's note, issue 542 U1-05) looks like text on the sunken band, not like an input:
+   no white box, no text cursor, no resize grip. It keeps its focus ring, so the keyboard still finds it. */
+.form-control[readonly] {
+  background: var(--surface-sunken);
+  border-style: dashed;
+  color: var(--text);
+  cursor: default;
+  resize: none;
+}
+
 .form-checkbox-row {
   display: flex;
   align-items: center;
@@ -559,6 +569,10 @@ textarea.form-control {
 }
 .ui-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex: none; }
 .ui-dialog-close { flex: none; margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) 0 0; min-width: 24px; min-height: 24px; }
+/* Touch targets (WCAG 2.5.5, issue 620): Close is 44 × 44 px on a phone or a touch screen, in every dialog and sheet. */
+@media (max-width: 699px), (pointer: coarse) {
+  .ui-dialog-close { min-width: var(--touch-target); min-height: var(--touch-target); margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) 0 0; }
+}
 .ui-dialog-heading {
   margin: 0;
   font-size: var(--size-xl);
@@ -566,7 +580,9 @@ textarea.form-control {
   font-weight: var(--weight-strong);
   overflow-wrap: anywhere;
 }
-.ui-dialog-body { flex: 1 1 auto; min-height: 0; overflow: auto; overflow-wrap: anywhere; }
+/* The scrolling body reaches 12 px into the dialog's padding (and the gap under the header), so what sits at its edge
+   keeps its hit area and focus ring: a (?) button's 44 px area is 12 px wider than its circle (issue 621). */
+.ui-dialog-body { flex: 1 1 auto; min-height: 0; overflow: auto; overflow-wrap: anywhere; margin: calc(-1 * var(--space-3)); padding: var(--space-3); }
 /* Table cells break long words only when they must: "anywhere" would shrink columns until headers break mid-word. */
 .ui-dialog-body :is(th, td) { overflow-wrap: break-word; }
 .ui-dialog > .modal-actions {
@@ -632,7 +648,8 @@ a.shell-product { color: inherit; text-decoration: none; }
 /* Administration's sidebar: the way back to the work pages, above the area's own entries. */
 .shell-nav-back { display: flex; align-items: center; gap: var(--space-1); color: var(--text-muted); }
 .shell-nav-back + .shell-nav-group { margin-top: var(--space-3); }
-/* Top right: Handbook, the gear to Administration (system administrators) and the user menu (issue 510). */
+/* Top right: Handbook, the gear to Administration (system administrators), the notifications bell (issue 557) and
+   the user menu (issue 510). */
 .shell-actions { flex-wrap: nowrap; }
 .shell-admin { position: relative; flex: none; padding: 5px 8px; }
 .shell-admin[aria-current] { color: var(--accent); background: var(--accent-light); }
@@ -693,6 +710,8 @@ a.shell-product { color: inherit; text-decoration: none; }
 .audit-history-dialog .audit-details { display: inline-block; min-width: 14rem; overflow-wrap: anywhere; }
 .shell-page .detail-section:first-child { padding-top: 0; }
 .shell-page .detail-section:last-child { border-bottom: 0; }
+/* Issue 611: a refusal or notice page has one section; the toast after it must not leave its rule standing. */
+.shell-page .detail-section--alone { border-bottom: 0; }
 .shell-page :not(td) > .toolbar { margin-block: var(--space-3); }
 .shell-page :is(.form-control, .form-select) { max-width: var(--field-max-width); }
 .shell-page input.form-control[type="number"] { max-width: 8rem; }
@@ -771,6 +790,16 @@ a.shell-product { color: inherit; text-decoration: none; }
 .export-research-table tbody th { background: transparent; text-align: left; }
 :is(.final-export-table, .export-research-table) thead th { text-align: left; background: transparent; color: var(--text-muted); font-size: var(--size-sm); border-bottom-color: var(--border-strong); }
 .final-export-table td[colspan] { text-align: left; }
+/* Issue 611: on a phone each row stacks: the text and its action on one line, the reason in full width below, so a
+   long "Why" (a question to the lead) reads as a sentence instead of a column of single words. */
+@media (max-width: 699px) {
+  .final-export-table, .final-export-table tbody { display: block; }
+  .final-export-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .final-export-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--space-2); border-bottom: 1px solid var(--border); }
+  .final-export-table tr > * { border-bottom: 0; }
+  .final-export-table tr > :only-child { grid-column: 1 / -1; }
+  .final-export-table td:nth-child(2):not(:last-child) { grid-row: 2; grid-column: 1 / -1; padding-top: 0; }
+}
 .export-row-status { margin: var(--space-1) 0 0; color: var(--text-muted); font-size: var(--size-sm); line-height: var(--leading-sm); }
 .export-row-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
 /* A disclosure like "Details and limits": the summary reads the same; the open list keeps the table's size. */
@@ -857,6 +886,8 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   .shell-reading .shell-breadcrumb li + li::before { margin-right: var(--space-1); }
   .shell-reading .shell-product { display: none; }
   .shell-reading .shell-actions { width: auto; flex: none; flex-wrap: nowrap; }
+  /* The bell and the user menu touch (44 px targets each), so the breadcrumb keeps its two lines (issue 557). */
+  .shell-reading .shell-actions:has(.shell-notifications) { column-gap: 0; }
   .shell-reading .shell-help { display: none; }
   .shell-reading .shell-nav-help { display: block; margin-top: var(--space-3); }
   .shell-reading .current-user { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -867,12 +898,15 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   /* Touch targets (issue 550, U5-03; WCAG 2.5.5): every control of the header and of the sidebar or Administration
      navigation is at least 44 × 44 px on a phone: the product name, the gear, the user menu, Handbook, Sections, the
      project pages and the Administration pages. */
-  .shell-header :is(.shell-admin, .shell-user-menu, .shell-help),
+  .shell-header :is(.shell-admin, .shell-notifications, .shell-user-menu, .shell-help),
   .shell-reading-navigation > summary {
     min-width: var(--touch-target);
     min-height: var(--touch-target);
   }
   a.shell-product { display: inline-flex; align-items: center; min-height: var(--touch-target); }
+  /* The breadcrumb's links and buttons too, as "Progress" on Translation reviews (issue 574 F3); the editor's
+     one header row keeps its small breadcrumb. */
+  .shell:not(.shell-reading) .shell-breadcrumb :is(a, button) { display: inline-flex; align-items: center; min-width: var(--touch-target); min-height: var(--touch-target); }
   /* A summary keeps its display (and so its marker): the text is centred by padding instead. */
   .shell-reading-navigation > summary { padding-block: calc((var(--touch-target) - 2px - var(--leading-md)) / 2); line-height: var(--leading-md); }
   .app-nav .shell-nav-link,
@@ -918,6 +952,52 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   .project-switcher-option[aria-selected="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; box-shadow: none; }
   .project-switcher-option[aria-selected="true"] :is(.project-switcher-option__link, .project-switcher-option__meta) { color: HighlightText; }
   .segment[aria-current="page"] { border-bottom-color: Highlight; color: Highlight; }
+}
+
+/* Help on demand (ui/Help.tsx, issue 556): a visible (?) next to a field or action; the explanation opens in place. */
+.ui-help-button {
+  position: relative; display: inline-flex; flex: none; align-items: center; justify-content: center; vertical-align: middle;
+  width: 20px; height: 20px; margin-inline-start: var(--space-1); padding: 0;
+  border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface-raised); color: var(--text-muted);
+  font: var(--weight-strong) var(--size-xs) / 1 var(--font-sans); cursor: pointer;
+}
+/* The hit area is larger than the circle: 36 px, 44 px on a touch screen. It is measured from inside the 1 px border
+   (the padding box), so it reaches 8 px (12 px) past the circle plus that border (issue 621). */
+.ui-help-button::after { content: ""; position: absolute; inset: calc(-8px - 1px); }
+@media (pointer: coarse) { .ui-help-button::after { inset: calc(-12px - 1px); } }
+.ui-help-button:hover { border-color: var(--accent); color: var(--accent); }
+.ui-help-button[aria-expanded="true"] { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.ui-help-button:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: var(--focus-offset); }
+.ui-help-text {
+  margin: 0; padding: var(--space-2) var(--space-3); border-inline-start: 3px solid var(--accent); border-radius: var(--radius-sm);
+  background: var(--accent-light); color: var(--text); font-size: var(--size-sm); line-height: var(--leading-sm); overflow-wrap: anywhere;
+}
+.ui-help-text[hidden] { display: none; }
+/* A field label with its (?): the label keeps its own spacing, the (?) sits right after it. */
+.form-label-row { display: flex; align-items: center; margin-bottom: 4px; }
+.form-label-row > .form-label { margin-bottom: 0; }
+.form-group > .ui-help-text { margin-bottom: var(--space-1); }
+.ui-help-text > p { margin: 0; max-width: none; }
+.ui-help-text > p + p { margin-top: var(--space-1); }
+/* A greyed action's reason (rule 4): shown above the button while it is pointed at, focused or pressed (under it in a scrolling box). */
+.ui-reason-anchor { position: relative; display: inline-flex; max-width: 100%; }
+.ui-reason-tip {
+  position: absolute; z-index: 5; inset-inline-end: 0; bottom: calc(100% + var(--space-2)); width: max-content; max-width: min(22rem, 80vw);
+  padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); background: var(--text); color: var(--surface-raised);
+  font-size: var(--size-sm); line-height: var(--leading-sm); pointer-events: none; visibility: hidden;
+}
+.ui-reason-anchor:hover > .ui-reason-tip,
+.ui-reason-tip[data-shown] { visibility: visible; }
+/* Inside a scrolling box (a dialog's body; issue 618): under the button, in the flow and as wide as the button, so the
+   box cannot cut it and it covers no other control; what follows moves down while it shows. */
+.ui-reason-anchor[data-tip="below"] { flex-direction: column; align-items: stretch; align-self: flex-start; }
+.ui-reason-anchor[data-tip="below"] > .ui-reason-tip {
+  position: static; display: none; width: auto; max-width: none; margin-top: var(--space-1); contain: inline-size; visibility: visible;
+}
+.ui-reason-anchor[data-tip="below"]:hover > .ui-reason-tip,
+.ui-reason-anchor[data-tip="below"] > .ui-reason-tip[data-shown] { display: block; }
+@media (forced-colors: active) {
+  .ui-reason-tip, .ui-help-text { border: 1px solid CanvasText; }
 }
 
 /* Lead workflow primitives: plan chip, tri-state cell, undo toast, group selection checkbox. */
@@ -1137,7 +1217,11 @@ ul.task-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space
   border-radius: var(--radius);
   background: var(--surface-raised);
   box-shadow: var(--shadow-2);
+  /* Taller than the room beside its button: the menu scrolls inside the window (MenuButton sets max-height). */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
+.ui-menu > * { flex-shrink: 0; }
 .ui-menu-item {
   min-height: 32px;
   padding: var(--space-1) var(--space-2);
@@ -1277,7 +1361,12 @@ button.stage-path-seg--current:focus-visible::after { border-color: var(--on-acc
 /* Issue 232: the paused banner in the editor, one line until it is opened. */
 .paused-notice { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
 .paused-notice__text { flex: 1; min-width: 0; display: grid; gap: var(--space-1); }
-.paused-notice__reason { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.paused-notice--open .paused-notice__reason { white-space: pre-wrap; overflow: visible; }
+/* Issue 611: closed, the line wraps at words and shows up to two lines (three on a phone), so a long title such as
+   "Paused until the lead answers your question" is never cut mid-word and the reason starts in sight. */
+.paused-notice__reason { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: break-word; }
+.paused-notice--open .paused-notice__reason { display: block; white-space: pre-wrap; overflow: visible; -webkit-line-clamp: none; line-clamp: none; }
+@media (max-width: 699px) {
+  .paused-notice__reason { -webkit-line-clamp: 3; line-clamp: 3; }
+}
 .paused-notice__toggle { flex: none; }
 .notice-content:has(> .paused-notice) { flex: 1; }

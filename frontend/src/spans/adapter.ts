@@ -23,7 +23,8 @@ export interface MentionDisplay {
   label?: string;
   segments: CodepointSegment[];
   is_suggestion?: boolean;
-  kind?: "own" | "target" | "source" | "context" | "modifier";
+  /** "pending": an item that needs review after a text change, a dashed mark without fill (#633). */
+  kind?: "own" | "target" | "source" | "context" | "modifier" | "pending";
   /** Preferred palette slot (editor/markColours.ts); the text may move it, see `colourKey`. */
   colorIndex?: number;
   /**

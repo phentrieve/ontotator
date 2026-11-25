@@ -1,5 +1,8 @@
 /**
  * Lead actions on one version row of the Translation part (issue 341):
+ * - `EditTranslationDialog` (issue 555): "Edit the translation…", one action for every change the lead makes
+ *   to an accepted version; the lead chooses by consequence (the meaning stays: no review, annotations move along /
+ *   the meaning changes: reviewed again, annotations stay), then the dialog of that way opens.
  * - `CorrectVersionDialog` (b): "Correct it myself…" of an accepted version; the lead correction panel
  *   lists the annotation work that stays on the version before anything is saved.
  * - `AcceptVersionDialog` (d): "Accept this version…" with a required reason, recorded like the work plan's
@@ -32,6 +35,49 @@ export function CorrectVersionDialog({ row, version, projectKey, onNavigate, onC
   return <Dialog open size="md" title={`Correct it myself, ${row.case_id} ${versionLabel(row, version)}, accepted`} onClose={onClose} returnFocus={returnFocus}>
     <LeadCorrectionPanel row={row} projectKey={projectKey} documentId={version.document_id} inDialog
       onNavigate={route => { onClose(); onNavigate(route); }} onCancel={onClose} />
+  </Dialog>;
+}
+
+/** Issue 555: the two ways to edit a version, named by what follows (no hint under the buttons). */
+export type EditKind = "typos" | "meaning";
+
+export function editChoices(version: number): ReadonlyArray<{ kind: EditKind; label: string; consequence: string }> {
+  return [
+    { kind: "typos", label: "Only spelling, spacing or grammar", consequence: `The meaning stays. No review; submitted annotations move to v${version + 1}.` },
+    { kind: "meaning", label: "The meaning changes", consequence: `v${version + 1} is reviewed again. Annotations stay on v${version}; you handle the text change after.` },
+  ];
+}
+
+export interface EditTranslationDialogProps {
+  row: DocumentRowView;
+  version: DocumentVersionView;
+  onChoose: (kind: EditKind) => void;
+  onClose: () => void;
+  returnFocus?: () => HTMLElement | null | undefined;
+}
+
+/** "Edit the translation…": the question first, the consequence of each answer in its label; Continue opens that way. */
+export function EditTranslationDialog({ row, version, onChoose, onClose, returnFocus }: EditTranslationDialogProps): JSX.Element {
+  const id = useId();
+  const [kind, setKind] = useState<EditKind | null>(null);
+  const [tried, setTried] = useState(false);
+  const missing = tried && kind === null;
+  return <Dialog open size="md" title={`Edit the translation, ${row.case_id} ${versionLabel(row, version)}`} onClose={onClose} returnFocus={returnFocus}
+    footer={<>
+      <Button onClick={onClose}>Cancel</Button>
+      <Button variant="primary" aria-describedby={missing ? `${id}-missing` : undefined}
+        onClick={() => { setTried(true); if (kind) onChoose(kind); }}>Continue</Button>
+    </>}>
+    <fieldset className="edit-translation-choice" aria-describedby={missing ? `${id}-missing` : undefined} aria-invalid={missing || undefined}>
+      <legend className="form-label">What changes?</legend>
+      {editChoices(version.version).map(choice => <label key={choice.kind} className="form-checkbox-row edit-translation-option">
+        <input type="radio" name={`${id}-kind`} value={choice.kind} checked={kind === choice.kind}
+          aria-labelledby={`${id}-${choice.kind}-label`} aria-describedby={`${id}-${choice.kind}`} onChange={() => setKind(choice.kind)} />
+        <span><span id={`${id}-${choice.kind}-label`} className="edit-translation-label">{choice.label}</span>
+          <span id={`${id}-${choice.kind}`} className="edit-translation-consequence">{choice.consequence}</span></span>
+      </label>)}
+      {missing && <InlineMessage tone="error"><span id={`${id}-missing`}>Choose what changes.</span></InlineMessage>}
+    </fieldset>
   </Dialog>;
 }
 

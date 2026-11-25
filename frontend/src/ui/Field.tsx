@@ -1,10 +1,16 @@
 import { cloneElement, type ReactElement, type ReactNode } from "react";
+import { HelpButton, HelpText, useHelp } from "./Help";
 
 export interface FieldOwn {
   id: string;
   label: ReactNode;
   hint?: ReactNode;
   error?: ReactNode;
+  /**
+   * An explanation on demand (issue 556): a (?) after the label that opens this text under it. `topic` names the
+   * button ("Help: Reason"); a hint that fits goes into the placeholder instead.
+   */
+  help?: { topic: string; content: ReactNode };
 }
 
 interface ControlProps {
@@ -19,7 +25,8 @@ export interface FieldProps extends FieldOwn {
   children: ReactElement<ControlProps>;
 }
 
-export function Field({ id, label, hint, error, required, children }: FieldProps) {
+export function Field({ id, label, hint, error, required, help, children }: FieldProps) {
+  const helpState = useHelp();
   const hasHint = hint != null && hint !== false && hint !== "";
   const hasError = !!error;
   const isRequired = required ?? children.props.required;
@@ -28,10 +35,12 @@ export function Field({ id, label, hint, error, required, children }: FieldProps
     ...(hasHint ? [`${id}-hint`] : []),
     ...(hasError ? [`${id}-error`] : []),
   ])].join(" ") || undefined;
+  const labelElement = <label className="form-label" htmlFor={id}>{label}{isRequired && " (required)"}</label>;
 
   return (
     <div className="form-group">
-      <label className="form-label" htmlFor={id}>{label}{isRequired && " (required)"}</label>
+      {help ? <div className="form-label-row">{labelElement}<HelpButton help={helpState} topic={help.topic} /></div> : labelElement}
+      {help && <HelpText help={helpState}>{help.content}</HelpText>}
       {cloneElement(children, { id, required: isRequired, "aria-describedby": describedBy, "aria-invalid": hasError })}
       {hasHint && <div id={`${id}-hint`} className="field-hint">{hint}</div>}
       {hasError && <div id={`${id}-error`} className="field-hint field-hint-error" role="alert">{error}</div>}

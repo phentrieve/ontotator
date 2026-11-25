@@ -61,6 +61,23 @@ describe("SearchPanel", () => {
     expect(options()[1].getAttribute("aria-disabled")).toBe("false");
   });
 
+  it("on a touch screen the hint says tap, without keys (#612)", async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("pointer: coarse"), media: query, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+    vi.useFakeTimers();
+    try {
+      renderPanel(vi.fn().mockResolvedValue(threeHits), { initialQuery: "seizure", autoFocus: true, debounceMs: 250 });
+      await act(async () => { await Promise.resolve(); });
+      expect(document.querySelector(".search-hint")!.textContent).toBe("3 terms, tap a term to add it");
+      expect(document.querySelector(".search-hint kbd")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      window.matchMedia = original;
+    }
+  });
+
   it("runs a prefilled query at once, shows it selected and makes the first usable hit active", async () => {
     vi.useFakeTimers();
     try {
@@ -418,6 +435,32 @@ describe("SearchPanel", () => {
     fireEvent.change(without, { target: { value: "seizure" } });
     await waitFor(() => expect(activeId(without)).toBe(options()[1].id));
     expect(screen.queryByRole("button", { name: /Show in tree/ })).toBeNull();
+  });
+
+  it("brings the active hit into view when the tree opens under the panel, and only then (issue 589)", async () => {
+    const scrolled: string[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) { scrolled.push(this.id || this.className); };
+    try {
+      const manager = new SearchManager({ searchOntology: vi.fn().mockResolvedValue(threeHits) } as any);
+      const props = { searchManager: manager, annotationId: "a", workspaceKey: key, layerId: "phenotype", onSelectCandidate: vi.fn(), debounceMs: 0, onShowInTree: vi.fn() };
+      const { rerender } = render(<SearchPanel {...props} />);
+      const input = screen.getByRole("combobox", { name: "Search term" });
+      fireEvent.change(input, { target: { value: "seizure" } });
+      await waitFor(() => expect(activeId(input)).toBe(options()[1].id));
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      expect(activeId(input)).toBe(options()[2].id);
+      scrolled.length = 0;
+      rerender(<SearchPanel {...props} treeShown />);
+      expect(scrolled).toEqual([options()[2].id]);
+      // Open, the tree moves nothing more; a new render of the open tree does not pull the hit back.
+      scrolled.length = 0;
+      rerender(<SearchPanel {...props} treeShown />);
+      rerender(<SearchPanel {...props} treeShown={false} />);
+      expect(scrolled).toEqual([]);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
   });
 
   it("shows no definition preview without an active hit", async () => {

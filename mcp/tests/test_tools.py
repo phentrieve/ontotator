@@ -440,6 +440,44 @@ async def test_adding_roles_needs_no_confirm(fake: FakeApi, mcp_client: Client) 
     assert not fake.calls_to("GET", f"{P}/assignments")
 
 
+async def test_consolidator_is_taken_for_adjudicator(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    """#629: the web interface and the CLI call the role Consolidator."""
+    fake.on("GET", f"{P}/members", [_member("ann", ["annotator"])])
+    fake.on("PUT", MEMBER, _member("ann", ["adjudicator", "annotator"]))
+    result = await call(
+        mcp_client,
+        "set_member_roles",
+        {
+            "project": "p",
+            "username": "ann",
+            "roles": ["annotator", "consolidator", "adjudicator"],
+        },
+    )
+    assert result["applied"] is True
+    assert result["plan"]["added_roles"] == ["adjudicator"]
+    [put] = fake.calls_to("PUT", MEMBER)
+    assert put.json()["roles"] == ["annotator", "adjudicator"]
+
+
+async def test_an_unknown_role_names_both_consolidator_names(
+    fake: FakeApi, mcp_client: Client
+) -> None:
+    tools = {tool.name: tool for tool in (await mcp_client.list_tools()).tools}
+    roles = tools["set_member_roles"].input_schema["properties"]["roles"]
+    assert "'adjudicator' is the Consolidator role" in roles["description"]
+    with pytest.raises(ToolFailed) as refused:
+        await call(
+            mcp_client,
+            "set_member_roles",
+            {"project": "p", "username": "ann", "roles": ["reviewer"]},
+        )
+    message = str(refused.value)
+    assert "'adjudicator'" in message and "'consolidator'" in message, message
+    assert fake.calls == []
+
+
 async def test_removing_a_person_is_a_dry_run_without_confirm(
     fake: FakeApi, mcp_client: Client
 ) -> None:

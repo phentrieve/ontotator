@@ -603,16 +603,21 @@ def _annotation_mode(
 ) -> AnnotationMode:
     """The mode a new annotate assignment on ``document_id`` gets (plan P3)."""
     from ontotator.application.annotation_modes import load_text_mode
-    from ontotator.storage.proposal_queries import newest_proposal_refs
+    from ontotator.storage.proposal_queries import (
+        has_review_items,
+        newest_proposal_refs,
+    )
 
     mode = load_text_mode(conn, project_id, document_id)
     if (
         mode.locked
         and mode.mode == "proposals"
         and not newest_proposal_refs(conn, project_id, document_id)
+        and not has_review_items(conn, project_id, document_id)
     ):
         # Plan review R10: a new version of a text annotated from proposals
-        # needs its own proposals; it never switches to scratch.
+        # needs its own proposals; it never switches to scratch. Proposals
+        # that wait for a check there count (#650).
         raise DomainError("NO_PROPOSALS_ON_VERSION", {"document_id": document_id})
     return mode.mode
 
@@ -1195,6 +1200,18 @@ class AssignmentService:
             details={"document_id": document_id, "user_id": target, "task": task},
             at=now,
         )
+        # Issue 557: the bell of the person who got the task.
+        from ontotator.application.notifications import notify
+
+        notify(
+            conn,
+            target,
+            project["id"],
+            "task_assigned",
+            actor_id=actor.user_id,
+            assignment_id=assignment_id,
+            at=now,
+        )
         return self._get(conn, assignment_id)
 
     def assign(
@@ -1586,6 +1603,17 @@ class AssignmentService:
             details=details,
             at=now,
         )
+        from ontotator.application.notifications import notify
+
+        notify(
+            conn,
+            old["user_id"],
+            project["id"],
+            "task_reopened",
+            actor_id=actor.user_id,
+            assignment_id=assignment_id,
+            at=now,
+        )
 
     @staticmethod
     def _restart_review_draft(
@@ -1864,6 +1892,7 @@ class AssignmentService:
                     )
                     .where(
                         ProblemReportRow.reporter_id == user_id,
+                        ProblemReportRow.kind == "problem",  # issue 553
                         ProblemReportRow.assignment_id.in_(
                             [r["assignment_id"] for r in rows]
                         ),

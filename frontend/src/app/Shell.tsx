@@ -10,6 +10,10 @@ import { projectDestination, ProjectSwitcher } from "./ProjectPicker";
 import { rememberedProject } from "./lastProject";
 import { useDocumentsSummary } from "../documents/useDocumentsSummary";
 import { TASKS_CHANGED } from "../tasks/tasksEvents";
+import { NotificationBell } from "../notifications/NotificationBell";
+import { useNotifications } from "../notifications/useNotifications";
+import { NOTIFICATIONS_CHANGED } from "../notifications/notificationsEvents";
+import { notifyQuestionsChanged, QUESTIONS_CHANGED } from "../questions/questionsEvents";
 import { TechnicalReportHost } from "../reports/TechnicalReportDialog";
 import { TECHNICAL_REPORTS_CHANGED } from "../reports/TechnicalReportsPage";
 import { openTechnicalReport, REPORT_NAV_LABEL, SHOW_MY_TECHNICAL_REPORTS } from "../reports/technicalReport";
@@ -23,7 +27,7 @@ export interface ShellProps {
   breadcrumb?: Crumb[];
   children: ReactNode;
   taskProject?: string;
-  /** The open task's kind: an annotator on a translation review reads as "Translation reviewer". */
+  /** The open task's kind: on a translation review the role line adds the task ("Annotator · translation review"). */
   taskKind?: string;
   /** Changes on each navigation to My tasks or Projects; the My tasks count reloads then (issue 192). */
   navigation?: unknown;
@@ -56,14 +60,18 @@ function NavigationLink({ destination, current, onNavigate, label, children }: {
 
 const ROLE_ORDER = ["lead", "adjudicator", "annotator"] as const;
 
-/** Second header line: the roles in the current project, else across all projects. */
+/**
+ * Second header line: the roles in the current project, else across all projects. Issue 611: the same person reads
+ * the same role everywhere; inside a translation review the task is named after the role, not in place of it.
+ */
 export function shellRole(user: CurrentUser, projects: readonly ProjectSummary[], current: ProjectSummary | undefined, taskKind?: string): string | undefined {
   const roles = new Set((current ? [current] : projects).flatMap(project => project.roles));
   const labels = [
     ...(user.is_system_admin ? ["System administrator"] : []),
-    ...ROLE_ORDER.filter(role => roles.has(role)).map(role => role === "annotator" && taskKind === "translation_review" ? "Translation reviewer" : roleLabels[role]),
+    ...ROLE_ORDER.filter(role => roles.has(role)).map(role => roleLabels[role]),
   ];
-  return labels.length ? labels.join(", ") : undefined;
+  if (!labels.length) return undefined;
+  return `${labels.join(", ")}${taskKind === "translation_review" && roles.has("annotator") ? " · translation review" : ""}`;
 }
 
 /**
@@ -110,6 +118,34 @@ const ADMIN_AREA: ReadonlySet<Route["name"]> = new Set(["adminUsers", "adminOnto
 /** Where the gear leads. */
 const ADMIN_START: Route = { name: "adminUsers" };
 
+/** Open questions of the project for its lead (issue 553, prototype); null for others or while unknown. */
+function useOpenQuestionCount(projectKey: string | undefined, navigation: unknown): number | null {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    let active = true;
+    setCount(null);
+    if (!projectKey) return;
+    // Issue 590: also after an answer on the Questions page and on window focus, so the count equals the Open tab;
+  // issue 629: and when the bell's count changes.
+    let request = 0;
+    const load = () => {
+      const mine = ++request;
+      api.listQuestions(projectKey, { state: "open" }).then(list => { if (active && mine === request) setCount(list.length); }, () => undefined);
+    };
+    load();
+    window.addEventListener(QUESTIONS_CHANGED, load);
+    window.addEventListener(NOTIFICATIONS_CHANGED, load);
+    window.addEventListener("focus", load);
+    return () => {
+      active = false;
+      window.removeEventListener(QUESTIONS_CHANGED, load);
+      window.removeEventListener(NOTIFICATIONS_CHANGED, load);
+      window.removeEventListener("focus", load);
+    };
+  }, [projectKey, navigation]);
+  return count;
+}
+
 /** Open technical reports for a system administrator (the navigation badge); null for others or while unknown. */
 function useOpenReportCount(admin: boolean, navigation: unknown): number | null {
   const [count, setCount] = useState<number | null>(null);
@@ -142,8 +178,20 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
   const current = projects.find(project => project.project_key === currentKey);
   const openTasks = useOpenTaskCount(user.username, navigation);
   const openReports = useOpenReportCount(user.is_system_admin, navigation);
+  const notifications = useNotifications(user.username);
+  // Issue 620: a move inside the app is a cheap moment to read the bell's count again (not on the first render,
+  // where the hook loads it anyway).
+  const place = routeHref(route);
+  const firstPlace = useRef(place);
+  const { refresh: refreshNotifications } = notifications;
+  useEffect(() => {
+    if (place === firstPlace.current) return;
+    firstPlace.current = "";
+    refreshNotifications();
+  }, [place, refreshNotifications]);
   // "Documents (n)": rows needing the lead's decision (V3); the summary is lead only.
   const needsDecision = useDocumentsSummary(current?.project_key, !!current?.can_manage && current.roles.includes("lead"));
+  const openQuestions = useOpenQuestionCount(current?.can_manage && current.roles.includes("lead") ? current.project_key : undefined, navigation);
   const switcher = projects.length > 0 && <ProjectSwitcher projects={projects} current={current} route={route}
     onNavigate={onNavigate} onChoose={key => setChoice({ username: user.username, key })} />;
   const link = (destination: Route, text: string, label?: string) => <li key={destination.name}>
@@ -183,6 +231,16 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
         <h2 title={current.name}>{current.name}</h2>
         <ul className="shell-nav-list">
           {documentsLink(current.project_key)}
+          {/* Issue 553 (prototype): the lead's open questions. */}
+          {current.roles.includes("lead") && <li key="projectQuestions">
+            {/* Issue 619: already on Questions, the link reloads the list and the count (the route stays the same). */}
+            <NavigationLink destination={{ name: "projectQuestions", key: current.project_key }} current={route}
+              onNavigate={destination => {
+                onNavigate(destination);
+                if (route.name === "projectQuestions" && route.key === current.project_key) notifyQuestionsChanged();
+              }}
+              label={openQuestions ? `Questions, ${openQuestions} open` : undefined}>{openQuestions ? `Questions (${openQuestions})` : "Questions"}</NavigationLink>
+          </li>}
           {link({ name: "projectProgress", key: current.project_key }, "Progress")}
           {link({ name: "projectSettings", key: current.project_key }, "Settings")}
           {link({ name: "projectExport", key: current.project_key }, "Export")}
@@ -207,9 +265,11 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
     aria-current={inAdmin ? "location" : undefined} onClick={inApp(ADMIN_START, onNavigate)}>
     <IconGear />{!!openReports && <span className="shell-admin-count" aria-hidden="true">{openReports > 99 ? "99+" : openReports}</span>}
   </a>;
+  // The bell (issue 557) sits next to the user menu, after the gear.
+  const actions = <>{gear}<NotificationBell state={notifications} onNavigate={onNavigate} /></>;
   // The logo's start page: the current project's landing (Documents for leads, its My tasks otherwise), else My tasks.
   const home = current ? projectDestination(current) : MY_TASKS;
-  return <AppShell user={user} userMenu={userMenu} actions={gear} breadcrumb={breadcrumb} nav={inAdmin ? adminNav : workNav}
+  return <AppShell user={user} userMenu={userMenu} actions={actions} breadcrumb={breadcrumb} nav={inAdmin ? adminNav : workNav}
     navLabel={inAdmin ? "Administration" : "Sections"} role={shellRole(user, projects, current, route.name === "task" ? taskKind : undefined)}
     homeHref={routeHref(home)} onHome={() => onNavigate(home)}
     density={(route.name === "task" || route.name === "projectCase") ? "reading" : "compact"}>{children}<TechnicalReportHost /></AppShell>;

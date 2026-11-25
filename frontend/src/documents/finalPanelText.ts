@@ -6,7 +6,7 @@ import type { AgreementView, DecisionBarView, DocumentRowView, DocumentRowsPage,
 import { plural } from "../app/labels";
 import { formatTime } from "../app/submissionLabels";
 import { versionName } from "./labels";
-import { leadSteps } from "./nextStepLabels";
+import { currentAnnotateWork, leadSteps } from "./nextStepLabels";
 import { rowKeyOf } from "./RowCells";
 import { roundName, submissionVersion } from "./SubmissionsTable";
 import type { ConsolidationInput, ConsolidationStarted } from "../variants/ConsolidationLauncher";
@@ -34,13 +34,8 @@ export function panelStep(row: Pick<DocumentRowView, "next_step" | "steps">): Ne
   return leadSteps(row).find(step => step.action != null && PANEL_ACTIONS.has(step.action)) ?? null;
 }
 
-/** Annotate work of the row's current versions (not moved to a newer one). */
-function currentAnnotateWork(row: Pick<DocumentRowView, "work">): DocumentRowView["work"] {
-  return (row.work ?? []).filter(item => item.task === "annotate" && item.moved_to_version == null);
-}
-
 /** Annotate assignments not submitted yet (open, in progress, reopened or paused). */
-export function openAnnotateWork(row: Pick<DocumentRowView, "work">): DocumentRowView["work"] {
+export function openAnnotateWork(row: Pick<DocumentRowView, "work"> & Partial<Pick<DocumentRowView, "versions">>): DocumentRowView["work"] {
   return currentAnnotateWork(row).filter(item => item.status !== "submitted");
 }
 
@@ -49,7 +44,7 @@ export function openAnnotateWork(row: Pick<DocumentRowView, "work">): DocumentRo
  * result (or consolidate) while other annotations are still open. True for a row without a final whose annotate
  * work is partly submitted and partly open, outside a running consolidation.
  */
-export function earlyFinal(row: Pick<DocumentRowView, "work" | "final" | "stages">): boolean {
+export function earlyFinal(row: Pick<DocumentRowView, "work" | "final" | "stages"> & Partial<Pick<DocumentRowView, "versions">>): boolean {
   if (row.final || row.stages?.annotation.state === "consolidating") return false;
   const work = currentAnnotateWork(row);
   return work.some(item => item.status === "submitted") && work.some(item => item.status !== "submitted");

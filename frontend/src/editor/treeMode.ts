@@ -98,4 +98,4 @@ export const treeModeNote = (mode: TreeMode): string | null =>
 
 /** What the confirmation says will happen. */
 export const takeEffect = (mode: "proposal" | "new", label: string, termId: string): string =>
-  mode === "proposal" ? `Proposal: decide as Changed with ${label} (${termId})` : `New finding: choose ${label} (${termId})`;
+  mode === "proposal" ? `Proposal: decide as Replaced with ${label} (${termId})` : `New finding: choose ${label} (${termId})`;

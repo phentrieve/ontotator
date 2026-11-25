@@ -3,7 +3,7 @@ import { api, ApiError, type BulkPlanRequest, type BulkPreview, type BulkResult,
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { plural } from "../app/labels";
 import { personLabel, textLabel } from "../app/identity";
-import { Button, Checkbox, Dialog, InlineMessage, Textarea, type TriState } from "../ui";
+import { Button, Checkbox, Dialog, HelpButton, HelpText, InlineMessage, ReasonButton, Textarea, type TriState, useHelp } from "../ui";
 import { allKeep, changedChoices, languageName, planReport, PRESET_LABELS, presetChoices, SOURCE_KEY, type PlanChoices, type PlanPreset } from "./planSummary";
 import { ANNOTATION_LABELS, PlanOption, proposalsHelp, REVIEW_HELP, SCRATCH_HELP } from "./PlanSteps";
 
@@ -26,7 +26,7 @@ const CHANGED_MESSAGE = "This plan changed. Reloaded the current plan.";
 const CHECKING = "Checking consequences…";
 /** The reason is kept with the plan change; the final export names it for texts taken out of the plan. */
 const REASON_HINT = "Kept with the change. The final export names it for texts you take out of the plan.";
-const REASON_HINT_ACCEPTANCE = "Kept with the acceptance and the change. The final export names it for texts you take out of the plan.";
+const REASON_HINT_ACCEPTANCE = "Kept with the change. When you accept translations, it is also kept with the acceptance: the acceptance is recorded with your name, the reason and the time. The final export names it for texts you take out of the plan.";
 
 const hasConsequences = (c: ConsequencesView): boolean => !!(c.withdrawn.length || c.finals_leaving.length || c.restored.length || c.open_reports?.length);
 /** "Leave as is (now on for 12, off for 8)" / "Leave as is (now off for 2 texts)": the current values in the selection (M2 F27, B1-2). */
@@ -40,6 +40,10 @@ const keptReviewText = (kept: number): string => `${plural(kept, "text")} ${kept
 /** The effect line under a quick choice: "Changes 12 texts" / "Already planned" (+ the started reviews it keeps). */
 export const presetEffectText = ({ change, kept }: { change: number; kept: number }): string =>
   `${change === 0 ? "Already planned." : `Changes ${plural(change, "text")}.`}${kept > 0 ? ` ${keptReviewText(kept)}` : ""}`;
+/** "Translation review and annotation (12 texts)": a quick choice names how many texts it changes (issue 556). */
+export const presetLabel = (preset: PlanPreset, effect?: { change: number }): string =>
+  // A no-break space keeps "(2 texts)" on one line (issue 621).
+  (effect && effect.change > 0 ? `${PRESET_LABELS[preset]} (${plural(effect.change, "text").replace(" ", "\u00a0")})` : PRESET_LABELS[preset]);
 type AnnotationChoice = "keep" | "off" | "on" | "proposals" | "scratch";
 /** "on" = annotate with each text's mode kept (a quick-action preset); the mode radios set a mode. */
 const annotationChoice = (choice: PlanChoices[string] | undefined): AnnotationChoice => {
@@ -96,7 +100,6 @@ function consequenceGroups(consequences: ConsequencesView): { language: string; 
 export function PlanDialog({ projectKey, caseIds, rows, initial, onClose, onSaved }: PlanDialogProps): JSX.Element {
   const ids = useId().replace(/:/g, "");
   const summaryId = `${ids}-summary`;
-  const reasonId = `${ids}-save-reason`;
   const caseKey = JSON.stringify(caseIds);
   const rowsKey = JSON.stringify(rows ?? []);
   /** Translation languages of the selected texts (not of their whole cases). */
@@ -110,6 +113,9 @@ export function PlanDialog({ projectKey, caseIds, rows, initial, onClose, onSave
   const [reload, setReload] = useState(0);
   const [step, setStep] = useState<{ kind: "edit" } | { kind: "confirm"; consequences: ConsequencesView }>({ kind: "edit" });
   const [understood, setUnderstood] = useState(false);
+  const quickHelp = useHelp();
+  // Rule 6: the dialog opens on its primary action, in view in the footer (issue 621); the body is still loading then.
+  const saveButton = useRef<HTMLButtonElement>(null);
   const [accept, setAccept] = useState<Record<string, boolean>>({});
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -226,30 +232,28 @@ export function PlanDialog({ projectKey, caseIds, rows, initial, onClose, onSave
   const title = `Work plan: ${plural(caseIds.length, "case")}`;
 
   const footer = <>
-    <span id={reasonId} className="dialog-footer-reason" hidden={!blocked || blocked === summary}>{blocked}</span>
     {confirming ? <Button onClick={() => { setStep({ kind: "edit" }); setUnderstood(false); }}>Back</Button> : <Button onClick={onClose}>Cancel</Button>}
-    <Button variant="primary" loading={saving} aria-disabled={blocked ? true : undefined} aria-describedby={blocked ? reasonId : undefined} onClick={save}>Save for {plural(caseIds.length, "case")}</Button>
+    {/* Issue 556 (rule 4): the greyed Save says why on hover, focus and press, not in a line before the buttons. */}
+    <ReasonButton ref={saveButton} variant="primary" loading={saving} reason={saving ? null : blocked || null} onClick={save}>Save for {plural(caseIds.length, "case")}</ReasonButton>
   </>;
 
-  return <Dialog open title={title} size="md" onClose={onClose} footer={footer}>
+  return <Dialog open title={title} size="md" onClose={onClose} footer={footer} initialFocus={saveButton}>
     <div className="work-plan-dialog">
       {notice && <InlineMessage tone="info">{notice}</InlineMessage>}
       {!preview && previewError === undefined && <p className="field-hint">{CHECKING}</p>}
       {previewError !== undefined && <><ErrorNotice error={previewError} /><Button size="sm" onClick={() => setReload(value => value + 1)}>Retry</Button></>}
-      {preview && !confirming && textLanguages.length > 0 && <fieldset className="plan-step plan-quick-choice">
-        <legend>Quick choice for the selected translations</legend>
+      {preview && !confirming && textLanguages.length > 0 && <fieldset className="plan-step plan-quick-choice" aria-labelledby={`${ids}-quick`}>
+        <legend><span id={`${ids}-quick`}>Quick choice for the selected translations</span><HelpButton help={quickHelp} topic="Quick choice" /></legend>
+        <HelpText help={quickHelp}><p>Fills the choices below for the selected texts only; nothing is saved until “Save”.</p></HelpText>
         <div className="plan-quick-choice-actions">
           {(Object.keys(PRESET_LABELS) as PlanPreset[]).map(preset => {
             const effect = presetEffects[preset];
-            const noteId = `${ids}-preset-${preset}`;
             const none = effect?.change === 0;
-            return <div key={preset} className="plan-quick-choice-item">
-              <Button aria-disabled={none || undefined} aria-describedby={effect ? noteId : undefined} onClick={() => { if (!none) applyPreset(preset); }}>{PRESET_LABELS[preset]}</Button>
-              {effect && <span id={noteId} className="field-hint">{presetEffectText(effect)}</span>}
-            </div>;
+            // Issue 556: the button names how many texts it changes; an already planned choice is greyed with its reason.
+            return <ReasonButton key={preset} reason={none ? presetEffectText(effect) : null}
+              onClick={() => { if (!none) applyPreset(preset); }}>{presetLabel(preset, effect)}</ReasonButton>;
           })}
         </div>
-        <p className="field-hint">Fills the choices below for the selected texts only; nothing is saved until “Save”.</p>
       </fieldset>}
       {preview && !confirming && languages.map(language => {
         const count = language.cases_in_selection === totalCases ? String(language.cases_in_selection) : `${language.cases_in_selection} of ${totalCases}`;
@@ -287,11 +291,10 @@ export function PlanDialog({ projectKey, caseIds, rows, initial, onClose, onSave
           {language.in_review > 0 && <p>{language.in_review} in review: wait for the review or withdraw it first.</p>}
           {acceptable(language) && <Checkbox id={checkboxId} label="These translations were reviewed outside Ontotator — accept them as they are" checked={!!accept[language.key]} onChange={event => setAccept(value => ({ ...value, [language.key]: event.target.checked }))} />}
           {language.marked_in_package > 0 && <p className="field-hint">{language.marked_in_package} already marked as reviewed in the package metadata need nothing.</p>}
-          <p className="field-hint">The acceptance is recorded with your name, the reason and the time.</p>
         </div>;
       })}
       {!confirming && <Textarea id={`${ids}-reason`} label={acceptLanguages.length ? "Reason" : "Reason (optional)"} required={acceptLanguages.length > 0} maxLength={2000} value={reason} onChange={event => setReason(event.target.value)}
-        hint={acceptLanguages.length ? REASON_HINT_ACCEPTANCE : REASON_HINT} />}
+        help={{ topic: "Reason", content: <p>{acceptance.length ? REASON_HINT_ACCEPTANCE : REASON_HINT}</p> }} />}
       {confirming && <div className="work-plan-confirm">
         {groups.map(group => <div key={group.language} className="work-plan-warning">
           <strong>{group.language} has work in {group.cases} of these cases.</strong>

@@ -258,6 +258,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   NOT_IN_WORK_PLAN: "This language version is not planned for this task.",
   EDITORIAL_CORRECTION_NOT_AVAILABLE: "This typo fix cannot be saved. Reload the row to see its current state.",
   QUERY_DECISION_NOT_AVAILABLE: "This query can no longer be decided here. Reload the row to see its current state.",
+  QUESTION_ANSWER_NOT_AVAILABLE: "This question cannot be answered this way. Reload to see its current state.",
+  QUESTION_PARTS_INVALID: "The question could not be sent. Check the quoted passage and the proposed wording.",
   CORRECTION_REASON_NOT_AVAILABLE: "Nothing can be added to this reason any more. Reload the row to see its current state.",
   LEAD_CORRECTION_NOT_AVAILABLE: "This translation can no longer be corrected here. Reload the row to see its current state.",
   VERSION_NOT_ACCEPTABLE: "This version can no longer be accepted here. Reload the row to see its current state.",
@@ -313,6 +315,11 @@ export function errorMessage(error: unknown): string {
   if (error instanceof ApiError && error.code === "JOB_QUEUE_LIMIT" && typeof error.details === "object" && error.details !== null) {
     const max = error.details.max;
     if (typeof max === "number" && Number.isSafeInteger(max) && max > 0) return `You already have ${max} jobs waiting. Try again when one of them has started.`;
+  }
+  // Issue 590: taking the asker's wording failed for a reason a reload does not change; the message says what to do.
+  if (error instanceof ApiError && error.code === "QUESTION_ANSWER_NOT_AVAILABLE" && typeof error.details === "object" && error.details !== null) {
+    if (error.details.reason === "quote_not_found") return "The quoted passage is no longer in the reviewer's text, so the wording cannot be taken. Untick “Take the proposed wording…” and send the answer without it.";
+    if (error.details.reason === "no_open_review") return "The reviewer's review is no longer open, so the wording cannot be taken. Untick “Take the proposed wording…” and send the answer without it.";
   }
   if (error instanceof ApiError && error.code === "TEXT_CHANGE_NOT_APPLICABLE" && typeof error.details === "object" && error.details !== null && error.details.reason === "no_target_proposals") {
     return "The new version has no proposals yet: their automatic transfer may still be running, or they must be imported. Wait for or import the proposals for the new version, then try again.";

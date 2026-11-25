@@ -6,7 +6,7 @@ import { plural } from "../../app/labels";
 import type { PathSegment, PathTone } from "../../ui/StagePath";
 import { earlyFinal } from "../finalPanelText";
 import { submissionVersion } from "../SubmissionsTable";
-import { annotatorCount, consolidationPause, shortName, stageText, startedOf, startedPart, submittedOf } from "../stageLabels";
+import { annotatorCount, BLOCKED_TEXT, consolidationPause, shortName, stageText, startedOf, startedPart, submittedOf } from "../stageLabels";
 
 export type SegmentId = "translation" | "annotation" | "finalization";
 export type CardView = "path" | "history" | "details";
@@ -94,6 +94,9 @@ export function annotationState(row: DocumentRowView, compact = false): State {
     case "blocked": {
       // People here hold a task that opens once the review is accepted (issue 213).
       const people = (detail.people ?? []).map(shortName).join(", ");
+      // Issue 613: a blocked cell names why, as the phone card does ("blocked, translation rejected").
+      const blocked = cell.state === "blocked" && detail.note ? BLOCKED_TEXT[detail.note] : undefined;
+      if (blocked) return { state: people ? `blocked, ${blocked} (${people} waiting)` : `blocked, ${blocked}`, tone: "later" };
       return { state: people ? `waiting for review (${people})` : "after translation review", tone: "later" };
     }
     case "unassigned":

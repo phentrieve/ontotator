@@ -36,7 +36,11 @@ from ontotator.application.final_causes import (
     latest_review_decisions,
 )
 from ontotator.application.people import person_refs
-from ontotator.application.typo_fix_carry import TypoFixMove, typo_fix_moves
+from ontotator.application.typo_fix_carry import (
+    TypoFixMove,
+    submission_order_times,
+    typo_fix_moves,
+)
 from ontotator.application.typography_counts import typography_hint_counts
 from ontotator.auth.audit import Actor
 from ontotator.authz.policy import Access
@@ -63,7 +67,10 @@ from ontotator.storage.plan_tables import (
     TranslationVersionUploadRow,
     WorkPlanFlagsRow,
 )
-from ontotator.storage.proposal_queries import newest_proposal_counts
+from ontotator.storage.proposal_queries import (
+    newest_proposal_counts,
+    review_item_documents,
+)
 from ontotator.storage.repository import Repository, _key_str
 from ontotator.storage.tables import (
     AnnotationSnapshotRow,
@@ -375,6 +382,11 @@ class RowFacts:
     # The same on the editable layers: the targets a carry of work from
     # proposals needs (``work_rounds.target_proposals``, #414).
     carry_proposal_counts: dict[str, int] = field(default_factory=dict)
+    # Issue 650: documents whose re-anchored proposals wait for a check
+    # (needs-review items), on any layer and on the editable layers. Work
+    # from proposals goes there as it goes to proposals; counts leave them out.
+    review_items: frozenset[str] = frozenset()
+    carry_review_items: frozenset[str] = frozenset()
     project_mode: AnnotationMode = "proposals"
     mode_overrides: dict[RowKey, AnnotationMode] = field(default_factory=dict)
     annotation_submissions: dict[str, list[tuple[datetime, AnnotationMode]]] = field(
@@ -887,40 +899,45 @@ def _submission_counts(conn: Connection, pid: int) -> dict[str, int]:
 
 
 def _selected_submissions(conn: Connection, pid: int) -> dict[str, SubmissionFact]:
+    """The final results' submissions; a typo-fix copy with the time the
+    person submitted (issue 575)."""
     named = select(FinalSelectionRow.submission_id).where(
         FinalSelectionRow.project_id == pid
+    )
+    rows = conn.execute(
+        select(
+            SubmissionRow.submission_id,
+            SubmissionRow.document_id,
+            SubmissionRow.annotator_id,
+            SubmissionRow.recorded_at,
+            SubmissionRow.mode,
+            RoundSubmissionBindingRow.round_id,
+        )
+        .outerjoin(
+            RoundSubmissionBindingRow,
+            and_(
+                RoundSubmissionBindingRow.project_id == SubmissionRow.project_id,
+                RoundSubmissionBindingRow.submission_id == SubmissionRow.submission_id,
+            ),
+        )
+        .where(
+            SubmissionRow.project_id == pid,
+            SubmissionRow.submission_id.in_(named),
+        )
+    ).all()
+    submitted_at = submission_order_times(
+        conn, pid, {row.submission_id: row.recorded_at for row in rows}
     )
     return {
         row.submission_id: SubmissionFact(
             submission_id=row.submission_id,
             document_id=row.document_id,
             annotator_id=row.annotator_id,
-            recorded_at=row.recorded_at,
+            recorded_at=submitted_at[row.submission_id],
             mode=row.mode,
             round_id=row.round_id,
         )
-        for row in conn.execute(
-            select(
-                SubmissionRow.submission_id,
-                SubmissionRow.document_id,
-                SubmissionRow.annotator_id,
-                SubmissionRow.recorded_at,
-                SubmissionRow.mode,
-                RoundSubmissionBindingRow.round_id,
-            )
-            .outerjoin(
-                RoundSubmissionBindingRow,
-                and_(
-                    RoundSubmissionBindingRow.project_id == SubmissionRow.project_id,
-                    RoundSubmissionBindingRow.submission_id
-                    == SubmissionRow.submission_id,
-                ),
-            )
-            .where(
-                SubmissionRow.project_id == pid,
-                SubmissionRow.submission_id.in_(named),
-            )
-        )
+        for row in rows
     }
 
 
@@ -977,7 +994,10 @@ def _reports(conn: Connection, pid: int) -> dict[str, ReportFact]:
                 ProblemReportStateRow.report_id == ProblemReportRow.report_id,
             )
             .join(UserRow, UserRow.id == ProblemReportRow.reporter_id)
-            .where(ProblemReportRow.project_id == pid)
+            # Issue 553: questions to the lead are not text problems.
+            .where(
+                ProblemReportRow.project_id == pid, ProblemReportRow.kind == "problem"
+            )
         )
     }
 
@@ -1430,6 +1450,9 @@ def load_facts(
     people_fields = {uid: ref.model_dump() for uid, ref in people.items()}
     # Read once: the final state and the source obligations share them.
     causes = repo.workflow_causes_in(conn, key, pid)
+    editable = build_scope(
+        TaskProfile.model_validate(project.task_profile), "proposal_check"
+    ).editable_layer_ids
     return RowFacts(
         project_key=key,
         viewer_user_id=viewer_user_id,
@@ -1495,13 +1518,9 @@ def load_facts(
         source_obligations=_source_obligations(causes),
         consolidation_flags={} if lean else load_consolidation_flags(conn, pid),
         proposal_counts=newest_proposal_counts(conn, pid),
-        carry_proposal_counts=newest_proposal_counts(
-            conn,
-            pid,
-            build_scope(
-                TaskProfile.model_validate(project.task_profile), "proposal_check"
-            ).editable_layer_ids,
-        ),
+        carry_proposal_counts=newest_proposal_counts(conn, pid, editable),
+        review_items=review_item_documents(conn, pid),
+        carry_review_items=review_item_documents(conn, pid, editable),
         project_mode=project.tool_proposal_mode,
         mode_overrides=_mode_overrides(conn, pid),
         annotation_submissions=_annotation_submissions(conn, pid),

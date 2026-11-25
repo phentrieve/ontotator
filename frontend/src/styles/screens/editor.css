@@ -629,11 +629,13 @@
 
 .run--color-5 { --run-fill: var(--mark-5-fill); }
 
-/* Overlapping marks (issue 524): one band per colour inside the same lower highlight zone, band 0 at the
-   bottom; editor/markColours.ts keeps different terms that overlap apart in colour and vendor/spans.js
-   (bandClasses) orders the bands by the marks' start in the text. Only the background changes: the line
-   height, the text and the lines of the mark states stay as they are. `run--band-I-N` gives band I the
-   fill of slot N. */
+/* Overlapping marks (issue 524): one band per colour, band 0 at the bottom; editor/markColours.ts keeps different
+   terms that overlap apart in colour and vendor/spans.js (bandClasses) orders the bands by the marks' start in the
+   text. Only the background changes: the line height, the text and the lines of the mark states stay as they are.
+   `run--band-I-N` gives band I the fill of slot N.
+   Legible at normal size (issue 551): stacked bands fill the run from 12% of its height, not only the lower half,
+   and a 1 px gap of the sheet (`--mark-band-separator`) parts every two bands. Two bands: band 0 keeps the zone of
+   a single mark (54% to 100%), so it runs on into a neighbour of the same finding; three bands share it in thirds. */
 
 .run--band-0-0 { --run-band-0: var(--mark-0-fill); }
 .run--band-0-1 { --run-band-0: var(--mark-1-fill); }
@@ -664,25 +666,30 @@
 .run--band-3-5 { --run-band-3: var(--mark-5-fill); }
 
 .run--bands-2 {
-  --run-highlight: linear-gradient(to bottom, transparent 0 40%,
-    var(--run-band-1) 54% 77%, var(--run-band-0) 77% 100%);
+  --run-highlight: linear-gradient(to bottom, transparent 0 6%,
+    var(--run-band-1) 12% calc(54% - 1px), var(--mark-band-separator) calc(54% - 1px) 54%,
+    var(--run-band-0) 54% 100%);
 }
 
 .run--bands-3 {
-  --run-highlight: linear-gradient(to bottom, transparent 0 40%,
-    var(--run-band-2) 54% 69%, var(--run-band-1) 69% 85%, var(--run-band-0) 85% 100%);
+  --run-highlight: linear-gradient(to bottom, transparent 0 6%,
+    var(--run-band-2) 12% calc(41% - 1px), var(--mark-band-separator) calc(41% - 1px) 41%,
+    var(--run-band-1) 41% calc(70% - 1px), var(--mark-band-separator) calc(70% - 1px) 70%,
+    var(--run-band-0) 70% 100%);
 }
 
 /* Four or more colours: two bands, and a top band striped in the third and fourth colour (a separate layer,
-   placed over 54% to 69% of the run). A fifth colour has no band of its own. */
+   placed over 12% to 41% of the run: 12% = (100% - 29%) x 16.9%). A fifth colour has no band of its own. */
 
 .run--bands-more {
-  --run-highlight: linear-gradient(to bottom, transparent 0 69%,
-    var(--run-band-1) 69% 85%, var(--run-band-0) 85% 100%);
+  --run-highlight: linear-gradient(to bottom, transparent 0 calc(41% - 1px),
+    var(--mark-band-separator) calc(41% - 1px) 41%,
+    var(--run-band-1) 41% calc(70% - 1px), var(--mark-band-separator) calc(70% - 1px) 70%,
+    var(--run-band-0) 70% 100%);
   --run-stripes: repeating-linear-gradient(90deg, var(--run-band-2) 0 4px, var(--run-band-3) 4px 8px);
   background-image: var(--run-highlight), var(--run-stripes);
-  background-size: 100% 100%, 100% 15%;
-  background-position: 0 0, 0 63.5%;
+  background-size: 100% 100%, 100% 29%;
+  background-position: 0 0, 0 16.9%;
   background-repeat: no-repeat;
 }
 
@@ -767,8 +774,8 @@
   background-image:
     repeating-linear-gradient(135deg, transparent 0 5px, var(--mark-negated-hatch) 5px 6px),
     var(--run-highlight), var(--run-stripes);
-  background-size: auto, 100% 100%, 100% 15%;
-  background-position: 0 0, 0 0, 0 63.5%;
+  background-size: auto, 100% 100%, 100% 29%;
+  background-position: 0 0, 0 0, 0 16.9%;
   background-repeat: repeat, no-repeat, no-repeat;
 }
 
@@ -1171,6 +1178,84 @@
 @media (max-width: 700px) { .sidebar-resizer { display: none; } }
 @media (forced-colors: active) { .sidebar-resizer-grip { background: CanvasText; } .sidebar-resizer:focus-visible { outline-color: Highlight; } }
 
+/* The right column as a rail (issue 540), as "Your review" in the translation review (issue 410): its left edge
+   resizes it (--inspector-width, set inline from editor/detailsRail.ts and remembered per user), the round button
+   on that edge collapses it to a 44 px strip, and the strip expands it again. Three columns only; elsewhere the
+   column keeps its place under the text or in "Details", and neither control is shown. */
+.details-rail-edge,
+.details-rail-expand { display: none; }
+@media (min-width: 1025px) {
+  @container case-screen (min-width: 1060px) {
+    /* Out of the flow, so it sizes no row or column of the layout: a 16 px strip centred on the column's left border,
+       over the whole height of the column (panel and tree). */
+    .case-screen:not(.case-comparing) .app-layout:has(> .details-rail-edge) { position: relative; }
+    .case-screen:not(.case-comparing) .details-rail-edge {
+      display: block;
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: calc(var(--inspector-width) - 8px);
+      width: 16px;
+      z-index: 3;
+    }
+    .details-rail-edge > .sidebar-resizer { position: absolute; inset: 0; width: 16px; margin: 0; }
+    /* On the edge, at the top: it covers no control of the text or the panel. */
+    .details-rail-edge > .details-rail-collapse {
+      position: absolute;
+      top: var(--space-2);
+      left: -4px;
+      width: 24px;
+      min-width: 24px;
+      height: 24px;
+      min-height: 24px;
+      padding: 0;
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      background: var(--surface-raised);
+      box-shadow: var(--shadow-1);
+      z-index: 3;
+    }
+    .case-screen:not(.case-comparing) .app-layout.details-collapsed > .inspector-pane,
+    .case-screen:not(.case-comparing) .app-layout.details-collapsed > .tree-host { display: none; }
+    .case-screen:not(.case-comparing) .app-layout.tree-open.details-collapsed { grid-template-rows: minmax(0, 1fr); }
+    .case-screen:not(.case-comparing) .details-rail-expand {
+      display: flex;
+      flex: none;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2);
+      width: var(--inspector-width);
+      min-height: 0;
+      padding: var(--space-3) 0;
+      border: 0;
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+    }
+    .case-screen:not(.case-comparing) .app-layout.tree-open > .details-rail-expand { grid-column: 3; grid-row: 1 / -1; }
+    .details-rail-expand:hover { background: var(--surface-sunken); }
+    .details-rail-expand:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: calc(-1 * var(--focus-width)); }
+    .details-rail-strip-label { writing-mode: vertical-rl; font-size: var(--size-md); line-height: var(--leading-md); font-weight: var(--weight-strong); }
+    /* Issue 596: the selection, under the label, with an accent bar; a long name is cut (full in the title). */
+    .details-rail-strip-selection {
+      writing-mode: vertical-rl;
+      min-height: 0;
+      max-height: 50%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding-inline-end: 2px;
+      border-inline-end: 3px solid var(--accent);
+      font-size: var(--size-sm);
+      line-height: var(--leading-sm);
+      color: var(--text-muted);
+    }
+  }
+}
+@media (forced-colors: active) { .details-rail-edge > .details-rail-collapse { border-color: CanvasText; } }
+
 /* The divider above the ontology tree sets the tree's height: only in the three-column layout, where
    the tree lies under the inspector. Unset, the rows of .tree-open apply; once dragged, .tree-sized
    gives the tree --tree-height (editor/treeHeight.ts) and the inspector the rest. */
@@ -1190,6 +1275,14 @@
       height: 16px;
       margin: -8px 0 0;
       cursor: row-resize;
+    }
+    /* Issue 596: opened from a hit of the term search, the tree gives way so that the panel keeps 320 px, room for
+       the term, the mark, the search field and the first hit (they end about 292 px down at 1280 × 720), but never
+       below 290 px for the tree: its header, the "Only looking" note, three rows and "Use this term instead…" in full
+       (issue 652: at 220 px, 1280 × 600 showed 2.5 rows and cut the button). The panel takes that room only when its
+       content needs it. At 1440 × 900 nothing changes. */
+    .case-screen:not(.case-comparing) .app-layout.tree-open:not(.tree-sized):not(.panel-given-to-tree):has(> .inspector-pane .search-panel .candidate-list) {
+      grid-template-rows: minmax(40%, auto) minmax(min(max(50%, min(400px, 60%)), max(290px, 100% - 320px)), 1fr);
     }
     .case-screen:not(.case-comparing) .app-layout.tree-open.tree-sized {
       /* The limits of treeHeight.ts once more, so that a height from a higher window can push
@@ -1594,6 +1687,20 @@
     .candidate-preview { position: static; }
     .search-panel .candidate-card { scroll-margin-bottom: 0; }
   }
+}
+
+/* Issue 542, U1-02: with the tree open the panel above it is short, and a pinned preview covered the hits, the
+   "Modifiers only" chip and the language hint. It follows the hits there, as in the stacked inspector. */
+.app-layout.tree-open .candidate-preview { position: static; }
+/* Issue 589: a hit brought into view stops above the divider of the tree, which reaches 8 px into the panel. */
+.app-layout.tree-open .search-panel .candidate-card { scroll-margin-bottom: 8px; }
+
+/* Title and "Show in tree" in one row (issue 540). */
+.candidate-preview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .candidate-preview-title {
@@ -2150,9 +2257,17 @@
 
 .review-actions__term {
   display: block;
-  margin-bottom: var(--space-2);
   font-size: var(--size-base);
   line-height: var(--leading-base);
+}
+
+/* The term and "Show in tree" in one row (issue 540). */
+.review-actions__term-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .axis-list {
@@ -2579,13 +2694,34 @@ details.case-version-controls > .btn { vertical-align: bottom; }
 
 /* Display-only reanchor context preserves the annotation's existing fill and selection. */
 .run--context { outline: 1px dotted var(--focus-ring); outline-offset: 1px; }
-.reanchor-context { white-space: pre-wrap; overflow-wrap: anywhere; }
+.reanchor-context { white-space: pre-wrap; overflow-wrap: break-word; }
 .problem-report-detail { width: min(100%, 72rem); margin-inline: auto; padding: var(--space-4); box-sizing: border-box; }
 .problem-report-detail form, .report-history { margin-block: var(--space-4); }
 .problem-report-detail fieldset { min-width: 0; }
 .report-history dd { margin-inline-start: 0; }
 .reanchor-panel ol { padding-left: var(--space-4); }
-.reanchor-panel .translation-diff { max-height: 16rem; min-height: 0; }
+/* An item that needs review after a text change (#633): a dashed frame where its words are now or where they were.
+   Its line form is its own (findings use fills and bottom borders); alone it has no fill, over a finding it keeps it. */
+.run--pending { outline: 1.5px dashed var(--warning); outline-offset: 1px; }
+.run--ghost { background-image: none; }
+.run--pending.run--framed { outline-style: solid; }
+/* Compact rows: term, the old words and the actions; the text change on demand. */
+.reanchor-row { padding-block: var(--space-1); border-radius: var(--radius-sm); }
+.reanchor-row[data-selected] { box-shadow: inset 3px 0 0 var(--warning); padding-left: var(--space-2); }
+.reanchor-row__head, .reanchor-row__values { margin: 0; overflow-wrap: anywhere; }
+.reanchor-row__values { color: var(--text-muted); font-size: var(--size-sm); }
+.reanchor-row__now { color: var(--text-muted); }
+.reanchor-row__term.btn { padding-inline: 0; font-weight: 600; }
+.reanchor-row__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-block: var(--space-1); }
+.reanchor-row__more > summary { cursor: pointer; font-size: var(--size-sm); }
+/* Issue 652: the diff reads like the contexts above it (the row's 14 px, not the reading text's 18 px) and breaks
+   lines between words, also where a deleted word meets the inserted one. */
+.reanchor-panel .translation-diff {
+  height: auto; max-height: 16rem; min-height: 0; padding: var(--space-2);
+  font-family: inherit; font-size: var(--size-md); line-height: var(--leading-md); overflow-wrap: break-word;
+}
+.reanchor-panel .translation-diff del + ins::before, .reanchor-panel .translation-diff ins + del::before { content: "\200B"; }
+.reanchor-row__next.btn { padding-inline: var(--space-1); font-variant-numeric: tabular-nums; }
 
 .reanchor-context mark { background: var(--warning-light); color: inherit; }
 .reanchor-context mark[data-old-kind~="cue"] { text-decoration: underline dotted; }
@@ -2809,6 +2945,24 @@ details.case-version-controls > .btn { vertical-align: bottom; }
 .values-section .axis-option.is-default:has(input:checked:focus-visible) {
   background: var(--warning-light);
   color: var(--warning);
+}
+/* Issue 612: a read-only task (submitted, paused, a reference) shows its values as values, not as choices: no
+   accent fill, a quiet frame; the chosen value stays in full contrast on a grey fill, the others are muted. */
+.values-section .axis-options.is-readonly {
+  border-color: var(--border);
+}
+.values-section .axis-options.is-readonly .axis-option {
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.values-section .axis-options.is-readonly .axis-option + .axis-option {
+  border-left-color: var(--border);
+}
+.values-section .axis-options.is-readonly .axis-option:has(input:checked):not(.is-default):not(.is-unset) {
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-weight: var(--weight-strong);
 }
 /* The group has no overflow clipping, so the raised focused segment shows its whole ring. */
 .values-section .axis-option:has(input:focus-visible) {
@@ -3313,4 +3467,80 @@ details.case-version-controls > .btn { vertical-align: bottom; }
 /* A touch screen without a keyboard: no key hints on the editor's buttons (issue 468). */
 @media (hover: none) and (pointer: coarse) {
   .case-screen .btn kbd.kbd { display: none; }
+  /* Tapping a hit adds it; the active hit shows no Enter key (issue 612). */
+  .candidate-enter { display: none; }
 }
+
+/* Issue 539: from 1025 px the case toolbar shares the app header's bar while a case is open (AppShell keeps a place
+   for it, after its own controls, so the Tab order is unchanged). The text and the ontology tree get the height of a
+   whole bar. The header shows what the bar needs: the case's name is the toolbar's title, not a second breadcrumb;
+   the user menu shows initials, as on a phone, and keeps its full name for assistive technology. A window too narrow
+   for one line wraps the case controls onto a second line, as before. */
+.shell-case-bar { min-width: 0; outline: none; }
+.shell-case-bar:empty { display: none; }
+@media (min-width: 1025px) {
+  .shell .shell-header:has(> .shell-case-bar > .case-toolbar) {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: var(--space-2) var(--space-4);
+    padding-block: var(--space-1);
+    border-bottom: 1px solid var(--border);
+  }
+  .shell-header:has(> .shell-case-bar > .case-toolbar) .shell-heading { flex: none; flex-wrap: nowrap; gap: var(--space-3); }
+  .shell-header:has(> .shell-case-bar > .case-toolbar) .shell-actions { flex: none; gap: var(--space-2); }
+  .shell-header:has(> .shell-case-bar > .case-toolbar) .shell-product { font-size: var(--size-base); line-height: var(--leading-base); }
+  .shell-header:has(> .shell-case-bar > .case-toolbar) .shell-breadcrumb { flex-wrap: nowrap; font-size: var(--size-md); }
+  .shell-header:has(> .shell-case-bar > .case-toolbar) .shell-breadcrumb li:last-child:not(:first-child) {
+    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .shell-header:has(> .shell-case-bar > .case-toolbar) .shell-user-menu .current-user {
+    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .shell-header:has(> .shell-case-bar > .case-toolbar) .shell-user-initials { display: inline; }
+  .shell-header:has(> .shell-case-bar > .case-toolbar) .shell-user-menu { padding: 3px 8px; }
+  /* Never narrower than what the case's controls need at their smallest (the name at its opening characters, the mode
+     at a few letters): a window that cannot give that much wraps the case controls onto a second line instead of
+     drawing them over each other (#627, e.g. a 1280 px window with the working time and the text stepper). */
+  .shell-header > .shell-case-bar:has(> .case-toolbar) {
+    flex: 1 1 640px;
+    min-width: min-content;
+    padding-left: var(--space-4);
+    border-left: 1px solid var(--border);
+  }
+  .case-toolbar.case-toolbar--merged {
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    gap: var(--space-3);
+  }
+  /* The bar shares its line with the header's controls (the bell among them, issue 557). The mode says what the task
+     asks ("Check after text change"), so it keeps its words: the case name gives way first, to an ellipsis (full
+     name in its title) but not below its opening characters; only then does the mode shorten. Both start from their
+     smallest width and grow up to their full text, the mode first (its far larger grow factor), so the bar's minimum
+     (#627) counts them at their smallest. A one-case stepper ("1 of 1") has nowhere to go and leaves the bar, as on a
+     phone. */
+  .case-toolbar--merged .case-title {
+    font-size: var(--size-reading); line-height: var(--leading-base);
+    flex: 1 1 7em; width: 7em; min-width: 7em; max-width: max-content;
+  }
+  /* Issue 596: a mode that does not fit on one line takes a second (the bar has room for two of its small lines)
+     instead of an ellipsis; it never gets narrower than about half its text (--mode-half, set in CaseScreen), so the
+     bar's minimum (#627) keeps both lines whole and a window too narrow for that wraps the case controls instead. */
+  .case-toolbar--merged .case-mode {
+    flex: 1000 1 var(--mode-half, 4em); width: var(--mode-half, 4em); min-width: min(var(--mode-half, 4em), max-content); max-width: max-content;
+    overflow: hidden; white-space: normal; line-height: 1rem;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  }
+  .case-toolbar--merged .app-title--single-case .case-navigation { display: none; }
+}
+/* A low window (below 800 px): the bar is tighter still, so the tree and the text keep every pixel the bar can spare. */
+@media (min-width: 1025px) and (max-height: 799px) {
+  .shell .shell-header:has(> .shell-case-bar > .case-toolbar) { padding-block: 2px; }
+  .shell-header:has(> .shell-case-bar > .case-toolbar) .btn-sm { min-height: 28px; padding-block: 2px; }
+}
+
+/* A hint that can be hidden once read (issue 540): its text, and a small close icon at its end. */
+.dismissible-hint { display: flex; align-items: flex-start; gap: var(--space-1); }
+.dismissible-hint > span { flex: 1; min-width: 0; }
+.dismissible-hint > .dismissible-hint__hide { flex: none; margin-top: -4px; }

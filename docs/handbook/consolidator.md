@@ -22,6 +22,7 @@ Decide each group by the text and the project guidelines, as if you were annotat
 - Not by majority. Two people can make the same mistake. If two of three said **Present** for "No muscular hypotonia", the right value is still **Absent**.
 - Not by seniority. Whose finding it was does not matter.
 - Read the passage in context. Check negation ("no", "without"), who has the finding (patient or family member), and when (now or in the past).
+- Codes may be shown without the ontology prefix (`N18.1` for `ICD10CM:N18.1`) if the project's lead chose that; the result keeps the full code.
 - Prefer the term the text supports. Usually that is the most specific term the text states; follow the guidelines if they say otherwise.
 - If none of the versions is right, use **More…** › **Other term…** or **Edit values…** ([Edit values or pick another term](#edit-values-or-pick-another-term)).
 - If the guidelines do not settle it, decide as well as you can, write a **Note for the lead** and tick **Guidelines unclear here**. The lead sees both and can improve the guidelines.
@@ -75,7 +76,7 @@ If the pause arrives while you have the consolidation open, the next decision is
 
 What for: see who marked what and work through the differences in order.
 
-1. The **Clinical text** shows one underline per person. The legend below says which line style belongs to whom. There are four line styles: with more than four people, the fourth (double) line stands for everyone from the fourth person on, and the legend lists them, for example *Line 4 (double): +5: …*. The table of a group still has every person. Kept findings are shaded; the selected group is framed.
+1. The **Clinical text** shows one underline per person. The legend below says which line style belongs to whom. There are four line styles: with more than four people, the fourth (double) line stands for everyone from the fourth person on, and the legend lists them, for example *Line 4 (double): +5: …*. The table of a group still has every person. Kept findings are shaded; the selected group is framed, with one frame per line around its whole passage, also where other findings overlap it.
 2. Beside it, the list **Groups** holds the groups in text order, each with its passage and [its state](#groups-and-their-states).
 3. One group is open at a time. Click a group, or a marked passage in the text, to open it.
 4. Press `j` for the next open group and `k` for the previous one, or click **Next open group** on the progress card.

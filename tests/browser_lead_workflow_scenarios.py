@@ -113,9 +113,11 @@ def case_units(
     languages: Sequence[str],
     *,
     marked: Iterable[str] = (),
+    lead_in: str = "",
 ) -> list[Any]:
     """Per case an ``en`` source and machine translations (``marked`` cases
-    carry ``translation.review.status == "reviewed"``, format 1.3)."""
+    carry ``translation.review.status == "reviewed"``, format 1.3). A
+    ``lead_in`` comes before each translation's text."""
     from t1_builders import native_unit, translation_unit
 
     marked = set(marked)
@@ -125,7 +127,10 @@ def case_units(
         units.append(source)
         for language in languages:
             unit = translation_unit(
-                case, language, f"{SYNTHETIC} ({case}, {language})", source=source
+                case,
+                language,
+                f"{lead_in}{SYNTHETIC} ({case}, {language})",
+                source=source,
             )
             units.append(package_reviewed(unit) if case in marked else unit)
     return units
@@ -460,21 +465,39 @@ QUERIED_CASES = {
 # What Ana changes in the texts she queries, and her question.
 QUERY_OLD, QUERY_NEW = "hypotonia", "muscular hypotonia"
 QUERY_RATIONALE = "The source says muscular hypotonia. Is the short form meant?"
+# Issue 591: paragraphs before the queried words, so the change starts below the
+# visible part of "Show the proposed text".
+LONG_LEAD_IN = "".join(
+    f"Paragraph {n}: the history of the family is unremarkable so far.\n\n"
+    for n in range(1, 9)
+)
 
 
-def queried_translation_for_lead(app: FastAPI) -> dict[str, Any]:
+def queried_translation_for_lead(
+    app: FastAPI, *, requery: bool = False, long_text: bool = False
+) -> dict[str, Any]:
     """Issue 483: rule on, 3 cases with de review + annotate. Ana queried the
     de translations of case-0101 and case-0102, each with a proposed text
     ("hypotonia" became "muscular hypotonia") and a question; she rejected
-    case-0103. The lead decides the queries under "Resolve…"."""
+    case-0103. The lead decides the queries under "Resolve…".
+
+    With ``requery`` (issue 574 F1) the lead has taken Ana's text of
+    case-0101 as v2, accepted, asked Ben to correct v2, and Ben queried v2.
+    With ``long_text`` (issue 591) eight paragraphs come before the queried
+    words."""
+    from ontotator.application.query_decisions import QueryDecisionService
     from ontotator.application.translation_reviews import TranslationReviewService
+    from ontotator.application.translation_workflow import (
+        TranslationWorkflowService,
+    )
 
     scenario = lead_project(app, "QUERIED_TRANSLATION_FOR_LEAD")
     scenario.app.state.accounts.update_profile(
         Actor.cli(), scenario.users["lead"], qualification="Physician"
     )
     case_ids = cases(101, 3)
-    docs = import_units(scenario, case_units(case_ids, ("de",)))
+    lead_in = LONG_LEAD_IN if long_text else ""
+    docs = import_units(scenario, case_units(case_ids, ("de",), lead_in=lead_in))
     plan(scenario, case_ids, {"de": REVIEW_AND_ANNOTATE})
     review = TranslationReviewService(scenario.db, scenario.app.state.jobs)
     access, _actor = identity(scenario, "ana")
@@ -498,11 +521,157 @@ def queried_translation_for_lead(app: FastAPI) -> dict[str, Any]:
     review_translation(
         scenario, docs[(QUERIED_CASES["rejected"], "de")], "ana", "rejected"
     )
+    if requery:
+        _lead_access, lead = identity(scenario, "lead")
+        v1 = docs[(QUERIED_CASES["take_text"], "de")]
+        decisions = QueryDecisionService(scenario.db, scenario.app.state.jobs)
+        shown = decisions.preview(lead, scenario.key, v1)
+        v2 = decisions.decide(
+            lead,
+            scenario.key,
+            v1,
+            kind="reviewer_text",
+            expected_text_sha256=shown["text_sha256"],
+            expected_review_id=shown["review"]["id"],
+            text=shown["review"]["proposed_text"],
+        )["document_id"]
+        again = TranslationWorkflowService(scenario.db, scenario.app.state.jobs)
+        asked = again.assign_correction(
+            lead,
+            scenario.key,
+            v2,
+            scenario.users["ben"],
+            expected_text_sha256=decisions.preview(lead, scenario.key, v2)[
+                "text_sha256"
+            ],
+            reason="Check the dose.",
+            confirm_language=True,
+        )
+        access, _actor = identity(scenario, "ben")
+        opened = review.open(access, asked.id)
+        revision = review.save_draft(
+            access,
+            asked.id,
+            expected_revision=opened.draft.revision,
+            text=opened.text,
+            form={
+                "decision": "query",
+                "clinical_change": True,
+                "categories": ["terminology"],
+                "rationale": REQUERY_RATIONALE,
+            },
+        )
+        review.submit(access, asked.id, expected_revision=revision)
     return result(
         scenario,
         all_rows(case_ids, ("de",)),
         case_ids={"de": list(case_ids)},
         cases=dict(QUERIED_CASES),
+    )
+
+
+REQUERY_RATIONALE = "Is the dose in v2 per day or per dose?"
+
+
+def queried_correction_for_lead(app: FastAPI) -> dict[str, Any]:
+    return queried_translation_for_lead(app, requery=True)
+
+
+def queried_long_translation_for_lead(app: FastAPI) -> dict[str, Any]:
+    return queried_translation_for_lead(app, long_text=True)
+
+
+QUESTION_CASES = {
+    "ask": "case-0101",
+    "asked": "case-0102",
+    "old_query": "case-0103",
+}
+# Issue 553: the passage Ana asks about, her wording and her question.
+QUESTION_QUOTE = "generalized hypotonia"
+QUESTION_PROPOSED = "generalized muscular hypotonia"
+QUESTION_TEXT = "The source says hypotonia. Should it read muscular hypotonia here?"
+OLD_QUERY_ANSWER = "The short form is meant. Accepted as it is."
+
+
+def question_for_lead(app: FastAPI) -> dict[str, Any]:
+    """Issue 553 (Ask the lead, prototype): rule on, 3 cases with de review +
+    annotate. Ana has open translation reviews of case-0101 (nothing asked)
+    and case-0102, where she asked the lead about "generalized hypotonia"
+    with a proposed wording, without pausing. case-0103 has her old review
+    submitted as Query, which the lead decided ("accepted as it is")."""
+    from ontotator.application.problem_reports import ProblemReportService
+    from ontotator.application.query_decisions import QueryDecisionService
+    from ontotator.application.translation_reviews import TranslationReviewService
+    from ontotator.assignments.service import AssignmentService
+
+    scenario = lead_project(app, "QUESTION_FOR_LEAD")
+    scenario.app.state.accounts.update_profile(
+        Actor.cli(), scenario.users["lead"], qualification="Physician"
+    )
+    case_ids = cases(101, 3)
+    docs = import_units(scenario, case_units(case_ids, ("de",)))
+    plan(scenario, case_ids, {"de": REVIEW_AND_ANNOTATE})
+    review = TranslationReviewService(scenario.db, scenario.app.state.jobs)
+    access, actor = identity(scenario, "ana")
+    tasks: dict[str, int] = {}
+    for name in ("ask", "asked", "old_query"):
+        document_id = docs[(QUESTION_CASES[name], "de")]
+        tasks[name] = assign(scenario, document_id, "ana", "translation_review")
+        review.open(access, tasks[name])
+    with scenario.db.transaction() as conn:
+        task = AssignmentService._get(conn, tasks["asked"])
+    asked = ProblemReportService(scenario.db).report(
+        access,
+        actor,
+        tasks["asked"],
+        request_id=f"question-{uuid4().hex}",
+        expected_workflow_revision=task.workflow_revision,
+        reason=QUESTION_TEXT,
+        round_id=task.active_round_id,
+        kind="question",
+        quote=QUESTION_QUOTE,
+        proposed_text=QUESTION_PROPOSED,
+        pause=False,
+    )
+    # The old way: a review submitted as Query, decided by the lead.
+    old = docs[(QUESTION_CASES["old_query"], "de")]
+    opened = review.open(access, tasks["old_query"])
+    revision = review.save_draft(
+        access,
+        tasks["old_query"],
+        expected_revision=opened.draft.revision,
+        text=opened.text.replace(QUERY_OLD, QUERY_NEW),
+        form={
+            "decision": "query",
+            "clinical_change": True,
+            "categories": ["terminology"],
+            "rationale": QUERY_RATIONALE,
+        },
+    )
+    review.submit(access, tasks["old_query"], expected_revision=revision)
+    decisions = QueryDecisionService(scenario.db, scenario.app.state.jobs)
+    lead = Actor.user(
+        scenario.app.state.accounts.get_by_username(scenario.users["lead"]).id,
+        scenario.users["lead"],
+    )
+    preview = decisions.preview(lead, scenario.key, old)
+    decisions.decide(
+        lead,
+        scenario.key,
+        old,
+        kind="unchanged",
+        expected_text_sha256=preview["text_sha256"],
+        expected_review_id=preview["review"]["id"],
+        answer=OLD_QUERY_ANSWER,
+    )
+    return result(
+        scenario,
+        all_rows(case_ids, ("de",)),
+        case_ids={"de": list(case_ids)},
+        cases=dict(QUESTION_CASES),
+        tasks=tasks,
+        report_id=asked.report_id,
+        report_reason=QUESTION_TEXT,
     )
 
 
@@ -734,10 +903,13 @@ BUILDERS: dict[str, Builder] = {
     "ROWS": build_rows,
     "REJECTED_TRANSLATION_FOR_LEAD": rejected_translation_for_lead,
     "QUERIED_TRANSLATION_FOR_LEAD": queried_translation_for_lead,
+    "QUERIED_CORRECTION_FOR_LEAD": queried_correction_for_lead,
+    "QUERIED_LONG_TRANSLATION_FOR_LEAD": queried_long_translation_for_lead,
     "ACCEPTED_TRANSLATION_FOR_LEAD": accepted_translation_for_lead,
     "UPLOAD_DIALOG": build_upload_dialog,
     "TYPO_FIX_CARRY": typo_fix_carry,
     "TYPO_FIX_PROPOSALS": typo_fix_proposals,
+    "QUESTION_FOR_LEAD": question_for_lead,
 }
 
 

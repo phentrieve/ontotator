@@ -22,6 +22,7 @@ import { ProjectSettingsPage } from "./admin/ProjectSettingsPage";
 import { DocumentsPage } from "./admin/DocumentsPage";
 import { ProgressPage } from "./admin/ProgressPage";
 import { TranslationReviewsPage } from "./admin/TranslationReviewsPage";
+import { QuestionsPage } from "./questions/QuestionsPage";
 import { ExportPage } from "./admin/ExportPage";
 import { ProjectsPage } from "./app/ProjectsPage";
 import { projectDestination } from "./app/ProjectPicker";
@@ -305,16 +306,16 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
   };
   let content: JSX.Element;
   // X-1: a page the role cannot use says so instead of showing a form the server refuses.
-  const notice = (title: string, message: string) => <section className="detail-section"><h1>{title}</h1><InlineMessage tone="info">{message}</InlineMessage></section>;
+  const notice = (title: string, message: string) => <section className="detail-section detail-section--alone"><h1>{title}</h1><InlineMessage tone="info">{message}</InlineMessage></section>;
   // With a failed project list only its error and Retry show (above the page), not a loading line that never ends.
   const accessLoading = projectError ? <></> : <InlineMessage tone="info">Loading project access…</InlineMessage>;
-  const projectGate = (key: string, page: string): JSX.Element | null => {
+  const projectGate = (key: string, page: string, refused = `${page} is for project leads. Your tasks for this project are under My tasks.`): JSX.Element | null => {
     const loaded = projectContext?.identity === projectIdentity;
     const known = loaded ? projects : lastProjects.current.username === user.username ? lastProjects.current.projects : [];
     const project = known.find(item => item.project_key === key);
     if (!project && !loaded) return accessLoading;
     if (!project) return <NotFound title="Project not found or no access" reason="It does not exist or you are not a member." onNavigate={go} />;
-    return project.can_manage ? null : notice(page, `${page} is for project leads. Your tasks for this project are under My tasks.`);
+    return project.can_manage ? null : notice(page, refused);
   };
   switch (route.name) {
     case "tasks": content = landing || landingSummary ? <InlineMessage tone="info">Loading your projects…</InlineMessage>
@@ -359,6 +360,9 @@ export function App({ user: givenUser, onLogout }: AppProps): JSX.Element {
     case "projectCase": content = <CaseViewer projectKey={route.key} caseId={route.caseId} variant={route.variant} show={route.show} annotations={route.annotations} compare={route.compare} compareShow={route.compare_show} documents={route.documents} username={user.username} onNavigate={go} />; break;
     case "projectProgress": content = <ProgressPage projectKey={route.key} onNavigate={go} />; break;
     case "projectTranslationReviews": content = <TranslationReviewsPage projectKey={route.key} query={route} onNavigate={go} />; break;
+    // Issue 590: lead only, like the other lead pages; the asker reads their questions and answers in their task.
+    case "projectQuestions": content = projectGate(route.key, "Questions", "The Questions page is for project leads. Your own questions and their answers are in your task, under “Questions to the lead”.")
+      ?? <QuestionsPage projectKey={route.key} question={route.question} onNavigate={go} />; break;
     case "projectExport": {
       const exported = projects.find(project => project.project_key === route.key);
       content = <ExportPage projectKey={route.key} currentUser={user} documentCount={exported?.document_count} onNavigate={go}

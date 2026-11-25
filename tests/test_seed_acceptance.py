@@ -550,3 +550,98 @@ def test_seed_writes_demo_logins_last_and_refuses_when_they_exist(
     )
     with pytest.raises(ValueError, match="already attempted"):
         seed["seed"](tmp_path)
+
+
+class FreshStack:
+    """A fresh stack whose image answers the dotted-id probe with ``dotted``."""
+
+    def __init__(self, dotted):
+        self.dotted = dotted
+        self.calls = []
+
+    def verify(self):
+        return {}
+
+    def cli(self, *args):
+        self.calls.append(("cli", *args))
+        if args == ("users", "list"):
+            return "admin\tp\tAdministrator\tactive, admin\n"
+        return ""
+
+    def compose(self, *args, data=None):
+        self.calls.append(("compose", *args))
+        if not self.dotted:
+            raise RuntimeError("Command failed; output withheld")
+        return ""
+
+
+def test_icd10cm_option_refuses_an_app_without_dotted_ids_before_any_write(
+    seed, tmp_path, monkeypatch
+):
+    stack = FreshStack(dotted=False)
+    globals_ = seed["seed"].__globals__
+    monkeypatch.setitem(
+        globals_, "load_prepared", lambda directory: {"directory": str(tmp_path)}
+    )
+    monkeypatch.setitem(globals_, "Stack", lambda cfg: stack)
+    with pytest.raises(ValueError, match=r"dotted term ids .*#489"):
+        seed["seed"](tmp_path, with_icd10cm=True)
+    # Only the read-only freshness checks and the probe ran; nothing was written.
+    assert [call[:2] for call in stack.calls] == [
+        ("cli", "users"),
+        ("cli", "projects"),
+        ("cli", "ontologies"),
+        ("compose", "exec"),
+    ]
+    assert seed["DOTTED_ID_PROBE"] in stack.calls[-1]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_icd10cm_option_refuses_a_checkout_without_the_fixture(seed, tmp_path):
+    with pytest.raises(ValueError, match=r"icd10cm\.json"):
+        seed["require_icd10cm_fixture"](tmp_path)
+
+
+def test_dotted_id_probe_passes_on_this_app(seed):
+    import sys
+
+    result = subprocess.run([sys.executable, "-c", seed["DOTTED_ID_PROBE"]])
+    assert result.returncode == 0
+
+
+def test_icd10cm_project_profile_pins_the_fixture_and_the_letter_fits_it(seed):
+    from ontotator.domain.profiles import TaskProfile
+
+    fixture = seed["require_icd10cm_fixture"]()
+    sha = hashlib.sha256(fixture.read_bytes()).hexdigest()
+    raw = seed["icd10cm_profile"](shipped_profile(), sha)
+    profile = TaskProfile.model_validate(raw)
+    assert [(o.ontology_id, o.sha256) for o in profile.ontologies] == [("icd10cm", sha)]
+    assert profile.layers[0].ontology_id == "icd10cm"
+    # The clinical axes come along, so the seed's creation defaults apply.
+    assert seed["clinical_creation_defaults"](raw, {}) == {
+        "icd-layer": {
+            "diagnosis": {
+                "assertion": "present",
+                "experiencer": "patient",
+                "temporality": "current",
+            }
+        }
+    }
+    graph = json.loads(fixture.read_text(encoding="utf-8"))["graphs"][0]
+    ids = {node["id"] for node in graph["nodes"]}
+    for code in ("E11.621", "N18.1", "T36.0X1A", "I10", "J45.30"):
+        assert f"ICD10CM:{code}" in ids
+    letter = seed["ICD10CM_LETTER"]
+    # The letter names the findings, not the codes: the annotator finds them.
+    assert re.findall(r"\b[A-Z]\d\d(?:\.[0-9A-Z]+)?\b", letter) == []
+    for words in ("Diabetes", "Fußulkus", "Stadium 1", "Amoxicillin", "Hypertonie"):
+        assert words in letter
+    assert "Asthma" in letter
+    assert seed["ICD10CM_ROLES"] == {
+        "demo-lead": "lead",
+        "demo-annotator": "annotator",
+        "demo-reviewer": "adjudicator",
+    }
+    # demo-annotator reads the letter's language: no language bypass is needed.
+    assert seed["ICD10CM_LANGUAGE"] in seed["ACTORS"]["demo-annotator"][2]

@@ -89,6 +89,10 @@ describe("Annotation cell", () => {
     expect(text("annotation", cell("in_progress", "running", { people: [ana], started: 0, open_tasks: 1 }))).toEqual(["○ Assigned, not started", "Ana Weber"]);
     expect(text("annotation", cell("in_progress", "running", { people: [ana], started: 1, open_tasks: 1 }))).toEqual(["◐ In progress", "Ana Weber"]);
     expect(text("annotation", cell("in_progress", "running", { people: [ana, tom], started: 1, open_tasks: 2 }))).toEqual(["◐ 1 of 2 started", "Ana Weber, Tom Reis"]);
+    // Issue 606: two annotators, nobody started: "○" as with one, not the running "◐".
+    expect(text("annotation", cell("in_progress", "running", { people: [ana, tom], submitted: 0, total: 2, started: 0, open_tasks: 2 })))
+      .toEqual(["○ 0 of 2 submitted", "waiting: Ana Weber, Tom Reis, not started"]);
+    expect(text("annotation", cell("in_progress", "running", { people: [ana, tom], submitted: 0, total: 2, started: 1, open_tasks: 2 }))[0]).toBe("◐ 0 of 2 submitted");
     expect(text("annotation", cell("in_progress", "running", { people: [tom], submitted: 1, total: 2, started: 0, open_tasks: 1 })))
       .toEqual(["◐ 1 of 2 submitted", "waiting: Tom Reis, not started"]);
     expect(text("annotation", cell("partly_assigned", "todo", { people: [tom], assigned: 1, target: 2, started: 0, open_tasks: 1 })))
@@ -143,6 +147,8 @@ describe("narrow table states (issue 248)", () => {
   const states: Record<string, string | null> = {
     "assigned, not started": "not started",
     "after translation review": "after review",
+    "blocked, translation rejected": "blocked",
+    "blocked, queried (Ana Weber waiting)": "blocked",
     "waiting for review (Ana Weber, Tom Reis)": "after review",
     "in review": null,
     "in review, 1 of 2 started": "in review",

@@ -94,6 +94,17 @@ describe("one of two annotations submitted, one still open (issue 123)", () => {
     expect(screen.queryByRole("button", { name: /^Remove/ })).toBeNull();
   });
 
+  it("does not offer an early accept for a submission on an older version (issue 613)", () => {
+    const versions = [version({ document_id: "doc-w08", chain_id: "w08", is_newest_in_chain: false }), version({ document_id: "doc-w08-v3", chain_id: "w08", version: 3 })];
+    const old = row({ ...early(), versions, work: [
+      work({ assignment_id: 1, document_id: "doc-w08", author_label: "ann-0003", status: "submitted" }),
+      work({ assignment_id: 2, document_id: "doc-w08-v3", author_label: "ann-0004", status: "in_progress", person: tom }),
+    ] });
+    render(<FinalizationPart row={old} projectKey="p" query={{}} onNavigate={vi.fn()} now={now} canManage tools={tools} />);
+    expect(screen.queryByText(/still open/)).toBeNull();
+    expect(screen.getByText(/^Starts once an annotation is submitted/)).toBeTruthy();
+  });
+
   it("still says when finalization starts while nothing is submitted", () => {
     const waiting = row({ case_id: "W09", language: "en", stages: stages({ annotation: stageCell("in_progress", "running", { total: 2, target: 2 }) }),
       work: [work({ assignment_id: 3, document_id: "doc-w09", status: "in_progress" })] });

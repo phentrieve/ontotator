@@ -1776,6 +1776,22 @@ describe("CaseScreen integration", () => {
     expect(document.querySelector("[role=status].case-status")!.textContent).toMatch(/^Submitted /);
   });
 
+  it("names when the person submitted an annotation a typo fix moved (issue 575)", () => {
+    const view = structuredClone(sampleView);
+    const fixedAt = new Date(2026, 10, 20, 22, 7).toISOString(), submittedAt = new Date(2026, 10, 20, 22, 3).toISOString();
+    view.submissions = [{ format_version: "ontotator-submission/v2", origin_key: view.key, targets: view.targets!,
+      draft_revision: 1, snapshots: [], decisions: [], document_checked: true, created_at: fixedAt, submission_id: "sub-copy" }];
+    const rendered = render(<CaseScreen view={view} workspaceId="moved" onClose={vi.fn()} readOnly
+      roundSubmission={{ submissionId: "sub-copy", recordedAt: submittedAt }} />);
+    const status = () => document.querySelector("[role=status].case-status time")!;
+    expect(status().getAttribute("datetime")).toBe(submittedAt);
+    expect(status().textContent).toContain("22:03");
+    // Another submission than the round's latest keeps its own time.
+    rendered.rerender(<CaseScreen view={view} workspaceId="moved" onClose={vi.fn()} readOnly
+      roundSubmission={{ submissionId: "sub-other", recordedAt: submittedAt }} />);
+    expect(status().getAttribute("datetime")).toBe(fixedAt);
+  });
+
   it("labels every profile axis and opens a finding with the keyboard", () => {
     const view = withEditableFinding(structuredClone(sampleView));
     view.draft.annotations![0].annotation.axes_values = { assertion: null, experiencer: "other", temporality: "historical" };
@@ -2704,6 +2720,27 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
     } finally { window.matchMedia = original; }
   });
 
+  it("touch: the attach banner's Cancel names no key (issue 652)", async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query === "(max-width: 700px)" || query === "(hover: none) and (pointer: coarse)", media: query, onchange: null,
+      addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const { container } = await setup(modView(SEIZURE_HYPO));
+      mark(container, "schwere");
+      fireEvent.click(within(container.querySelector<HTMLElement>(".pending-bar")!).getByRole("button", { name: "Choose term" }));
+      const input = screen.getByRole("combobox", { name: "Search term" });
+      await waitFor(() => expect(input.getAttribute("aria-activedescendant")).toBeTruthy());
+      fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(container.querySelector("#findings-column .attach-mention-banner")).not.toBeNull());
+      for (const banner of container.querySelectorAll<HTMLElement>(".attach-mention-banner")) {
+        expect(banner.textContent).not.toContain("Esc");
+        expect(within(banner).getByRole("button", { name: "Cancel" })).toBeDefined();
+      }
+    } finally { window.matchMedia = original; }
+  });
+
   it("a click on another finding's mark attaches to it", async () => {
     const { container, apply } = await setup(modView(SEIZURE_HYPO));
     await startAttach(container);
@@ -2801,7 +2838,7 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
     fireEvent.click(await screen.findByRole("button", { name: "Actions, Recurrent" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Link a text span…" }));
     const banner = container.querySelector<HTMLElement>(".attach-mention-banner")!;
-    expect(banner.textContent).toContain("Select the text for Recurrent, then press Enter. Esc cancels.");
+    expect(banner.textContent).toContain("Select the text for Recurrent. Esc cancels.");
     fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() => expect(container.querySelector(".attach-mention-banner")).toBeNull());
     expect(document.activeElement?.closest('[data-modifier-chip="HP:0031796"]')).not.toBeNull();
@@ -2813,6 +2850,21 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
     await waitFor(() => expect(payloads(apply)).toEqual([{ command: "set_modifier_segments", annotation_id: "seizure", term_id: "HP:0031796", segments: [pos("wiederholt")] }]));
     await waitFor(() => expect(announcer(container)).toBe("Linked “wiederholt” to Recurrent."));
     expect(screen.queryByRole("region", { name: "New finding" })).toBeNull();
+  });
+
+  it("Change text span…: the finding's handles are inactive while the modifier's text is picked (issue 583)", async () => {
+    const { container } = await setup(modView(SEVERE_ON_SEIZURE));
+    const handles = () => Array.from(container.querySelectorAll<HTMLElement>(".resize-handle")).map(el => `${el.dataset.mention}:${el.dataset.edge}`);
+    fireEvent.click(container.querySelector('[data-list-key="annotation:seizure"]')!);
+    await waitFor(() => expect(handles()).toEqual(["ev-seizure:start", "ev-seizure:end"]));
+    fireEvent.click(await screen.findByRole("button", { name: "Actions, Severe" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Change text span…" }));
+    expect(container.querySelector(".attach-mention-banner")!.textContent).toContain("Select the text for Severe. Esc cancels.");
+    await waitFor(() => expect(handles()).toEqual([]));
+    // Esc ends the mode: the finding's handles come back.
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() => expect(container.querySelector(".attach-mention-banner")).toBeNull());
+    await waitFor(() => expect(handles()).toEqual(["ev-seizure:start", "ev-seizure:end"]));
   });
 
   it("hovering a finding row frames its marks and modifier segments; a click on a modifier segment selects the finding and focuses the chip", async () => {
@@ -3781,7 +3833,7 @@ describe("CaseScreen: finding modifiers (attach mode, Modifiers section, marks)"
         const { apply, decide } = draftSpy(view);
         await openProposal(container);
         fireEvent.click(within(proposalPanel()).getByRole("button", { name: "Link a text span" }));
-        expect(container.querySelector(".attach-mention-banner")!.textContent).toContain("Select the text for Recurrent, then press Enter. Esc cancels.");
+        expect(container.querySelector(".attach-mention-banner")!.textContent).toContain("Select the text for Recurrent. Esc cancels.");
         // Nothing is written before the text is chosen.
         expect(payloads(apply)).toEqual([]);
         mark(container, "wiederholt");

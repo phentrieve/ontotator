@@ -1,8 +1,8 @@
 /**
  * Issue 483: the lead decides a translation review submitted as a query, under "Resolve…" on the Documents row.
- * - "Accept the reviewer's text…": the reviewer's proposed text with its changes against the version becomes v2,
+ * - "Accept the reviewer's text as v2…": the reviewer's proposed text with its changes against the version becomes v2,
  *   accepted; the answer is optional.
- * - "Answer and accept the version as it is…": v1 is accepted unchanged; the answer is required.
+ * - "Accept v1 as it is…": v1 is accepted unchanged; the answer is required.
  * After each the row goes on (the annotation can be assigned), the version row and History name the decision,
  * and the reviewer reads the answer at the submitted task.
  * Driven through the real endpoints at 1440 px and at 390 px; no console errors, no horizontal page scroll.
@@ -59,11 +59,17 @@ async function openCard(page: Page, caseId: string) {
 /** "Resolve…" on the row of a queried text: the options with the reviewer's question. */
 async function resolveOptions(page: Page, caseId: string) {
   await rowAction(page, "Resolve…", caseId, "de").click();
-  const options = page.getByRole("group", { name: textNamePattern("Resolve queried translation, ", caseId, "de") });
+  // Issue 554: a dialog; what is asked and the proposed text come first, then the two decisions, the rest under Other ways….
+  const options = page.getByRole("dialog", { name: textNamePattern("Resolve queried translation, ", caseId, "de") });
   await expect(options).toContainText("Ana Weber asked a question about this translation.");
   await expect(options).toContainText(QUESTION);
-  await expect(options.getByRole("button")).toHaveText(["Accept the reviewer’s text…", "Answer and accept the version as it is…", "Reopen Ana Weber's review…",
-    "Assign a new review…", "Correct the translation…", "Discard the de translation…", "Cancel"]);
+  await expect(options.getByText(/^Show the proposed text \(\d+ passages? changed\)$/)).toBeVisible();
+  await expect(options.locator(".modal-actions").getByRole("button")).toHaveText(["Other ways…", "Cancel", "Accept v1 as it is…", "Accept the reviewer’s text as v2…"]);
+  await expect(options.getByRole("button", { name: "Accept the reviewer’s text as v2…", exact: true })).toBeFocused();
+  await options.getByRole("button", { name: textNamePattern("Other ways to resolve ", caseId, "de") }).click();
+  await expect(page.getByRole("menuitem")).toHaveText([/^Reopen Ana Weber's review…/, /^Assign a new review…/, /^Correct it myself \(counts as accepted\)…/, /^Discard the de translation…/]);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
   return options;
 }
 
@@ -90,7 +96,7 @@ async function reviewerReads(page: Page, s: LeadScenario, caseId: string, lines:
 }
 
 for (const [name, viewport] of sizes) {
-  test(`${name} px: Accept the reviewer's text… makes it v2, accepted, and the reviewer reads the answer`, async ({ page }) => {
+  test(`${name} px: Accept the reviewer's text as v2… makes it v2, accepted, and the reviewer reads the answer`, async ({ page }) => {
     await page.setViewportSize(viewport);
     const errors = consoleErrors(page);
     const s = await leadScenario(page, "QUERIED_TRANSLATION_FOR_LEAD");
@@ -98,8 +104,12 @@ for (const [name, viewport] of sizes) {
     await login(page, s, "lead");
     const options = await resolveOptions(page, caseId);
     await shot(page, `options-${name}`);
-    await options.getByRole("button", { name: "Accept the reviewer’s text…", exact: true }).click();
-    const dialog = page.getByRole("dialog", { name: `Accept the reviewer’s text, ${caseId} de v1`, exact: true });
+    // The proposed text, on demand, before the decision.
+    await options.getByText(/^Show the proposed text/).click();
+    await expect(options.getByRole("region", { name: "Ana Weber’s proposed text, changes to v1", exact: true }).locator("ins")).toHaveText(/muscular/);
+    await shot(page, `options-proposal-${name}`);
+    await options.getByRole("button", { name: "Accept the reviewer’s text as v2…", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: `Accept the reviewer’s text as v2, ${caseId} de v1`, exact: true });
     // The reviewer's proposed text, not the version's, with the change marked against v1.
     const editor = dialog.getByRole("textbox", { name: "Reviewer’s text", exact: true });
     await expect(editor).toHaveValue(/generalized muscular hypotonia\./);
@@ -122,6 +132,8 @@ for (const [name, viewport] of sizes) {
     await expect(v2).toContainText("Accepted");
     await expect(v2).toContainText(new RegExp(`Accepted: decision on the query of Ana Weber \\(${esc(s.pseudonyms.ana)}\\), the reviewer’s text taken, Project Lead \\(${esc(s.pseudonyms.lead)}, you\\), ${TIME} · Answer: Yes, as you proposed\\.`));
     await expect(card).not.toContainText("reviewed outside Ontotator");
+    // Issue 574 F2: no "Assign review…" on the accepted v2; its dialog could assign nothing.
+    await expect(card.getByRole("button", { name: "Assign review…", exact: true })).toHaveCount(0);
     await shot(page, `take-text-card-${name}`);
     await card.getByRole("button", { name: /^History \(\d+\)$/ }).click();
     await expect(activityLines(card).filter({ hasText: "query decided" })).toHaveText(
@@ -133,15 +145,15 @@ for (const [name, viewport] of sizes) {
     expect(errors).toEqual([]);
   });
 
-  test(`${name} px: Answer and accept the version as it is… needs an answer and accepts v1 unchanged`, async ({ page }) => {
+  test(`${name} px: Accept v1 as it is… needs an answer and accepts v1 unchanged`, async ({ page }) => {
     await page.setViewportSize(viewport);
     const errors = consoleErrors(page);
     const s = await leadScenario(page, "QUERIED_TRANSLATION_FOR_LEAD");
     const caseId = s.cases!.answer_only;
     await login(page, s, "lead");
     const options = await resolveOptions(page, caseId);
-    await options.getByRole("button", { name: "Answer and accept the version as it is…", exact: true }).click();
-    const dialog = page.getByRole("dialog", { name: `Answer and accept the version as it is, ${caseId} de v1`, exact: true });
+    await options.getByRole("button", { name: "Accept v1 as it is…", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: `Accept v1 as it is, ${caseId} de`, exact: true });
     await expect(dialog).toContainText("v1 is accepted without changes. It is recorded as your decision on the query.");
     await expect(dialog).toContainText("The reviewer also proposed a changed text. It is not taken.");
     // Without an answer nothing is saved.
@@ -171,6 +183,50 @@ for (const [name, viewport] of sizes) {
 
     await reviewerReads(page, s, caseId, [/The lead decided your query on .+\. v1 was accepted as it is\./, "Answer from the lead: The short form is meant; the source is the same in both places."]);
     await shot(page, `answer-reviewer-${name}`);
+    expect(errors).toEqual([]);
+  });
+}
+
+// Issue 574 F1: Ben queried v2 after the lead took Ana's text as v2: the dialogs decide v2, not the decided v1.
+// F2: the card of the accepted v2 offers no "Assign review…" whose dialog could assign nothing; Reopen… stays.
+for (const [name, viewport] of sizes) {
+  test(`${name} px: a query on a corrected version is decided at that version`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const errors = consoleErrors(page);
+    const s = await leadScenario(page, "QUERIED_CORRECTION_FOR_LEAD");
+    const caseId = s.cases!.take_text;
+    await login(page, s, "lead");
+    await rowAction(page, "Resolve…", caseId, "de").click();
+    // Issue 554: Resolve… is a dialog; the reviewer's review is reopened under Other ways….
+    const options = page.getByRole("dialog", { name: textNamePattern("Resolve queried translation, ", caseId, "de") });
+    await expect(options).toContainText("Ben Roth asked a question about this translation.");
+    await expect(options).toContainText("Is the dose in v2 per day or per dose?");
+    await options.getByRole("button", { name: textNamePattern("Other ways to resolve ", caseId, "de") }).click();
+    await expect(page.getByRole("menuitem", { name: /^Reopen Ben Roth's review…/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    // Ben proposed no change, so there is no reviewer's text to take (issue 554); v2 is decided as it is.
+    await expect(options).toContainText("Ben Roth proposed no change to the text.");
+    await expect(options.getByRole("button", { name: /^Accept the reviewer’s text/ })).toHaveCount(0);
+    await options.getByRole("button", { name: "Accept v2 as it is…", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: `Accept v2 as it is, ${caseId} de`, exact: true });
+    await expect(dialog).toContainText("v2 is accepted without changes. It is recorded as your decision on the query.");
+    await expect(dialog).not.toContainText("already decided");
+    await dialog.getByRole("textbox", { name: /^Answer to the reviewer/ }).fill("Per day, as the source says.");
+    await shot(page, `requery-dialog-${name}`);
+    await dialog.getByRole("button", { name: "Accept v2", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(documentsLive(page)).toHaveText(`${caseId} de v2 was accepted as it is. The reviewer sees your answer at their submitted task.`);
+    await rowGoesOn(page, caseId);
+
+    const card = await openCard(page, caseId);
+    const v2 = (await textVersionItems(card, 2)).filter({ hasText: "Correction of v1" });
+    await expect(v2).toContainText("Accepted");
+    await expect(v2).toContainText(new RegExp(`Accepted: decision on the query of Ben Roth \\(${esc(s.pseudonyms.ben)}\\), the version kept as it is`));
+    // The way to a new review of v2: Ben reviews it again.
+    await expect(v2.getByRole("button", { name: "Reopen Ben Roth’s translation review", exact: true })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Assign review…", exact: true })).toHaveCount(0);
+    await shot(page, `requery-card-${name}`);
     expect(errors).toEqual([]);
   });
 }

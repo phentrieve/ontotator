@@ -43,6 +43,8 @@ describe("Annotation", () => {
   it("waits for the translation review", () => {
     expect(annotationState(cardRow({ annotation: cell("after_review", "waiting") }))).toEqual({ state: "after translation review", tone: "later" });
     expect(annotationState(cardRow({ annotation: cell("blocked", "waiting") }))).toEqual({ state: "after translation review", tone: "later" });
+    // Issue 613: a blocked cell names why, as the phone card does.
+    expect(annotationState(cardRow({ annotation: cell("blocked", "waiting", { note: "translation_rejected" }) }))).toEqual({ state: "blocked, translation rejected", tone: "later" });
     expect(annotationState(cardRow({ annotation: cell("after_review", "waiting", { people: [{ pseudonym: "ann-1", display_name: "Ana", is_me: false }] }) }))).toEqual({ state: "waiting for review (Ana)", tone: "later" });
   });
   it("annotation with one of max 2 annotators is now (R-13); no proposal count, never 0 of 0", () => {
@@ -125,6 +127,19 @@ describe("Finalization", () => {
     // Nothing submitted yet: still waiting.
     const open = [annotateItem({ assignment_id: 3, status: "in_progress" })];
     expect(finalizationState(cardRow({ final: cell("after_annotation", "waiting") }, { work: open }), now)).toEqual({ state: "waiting", tone: "later" });
+  });
+  it("a submission on an older version does not make the current text acceptable (issue 613)", () => {
+    // v1 submitted, the text is at v3 (Carry to v3 pending) with an open task on v3: the server says "after annotation".
+    const versions = [
+      version({ document_id: "case-200-de", chain_id: "de", is_newest_in_chain: false }),
+      version({ document_id: "case-200-de-v3", chain_id: "de", version: 3 }),
+    ];
+    const work = [annotateItem({ assignment_id: 1, status: "submitted" }), annotateItem({ assignment_id: 2, document_id: "case-200-de-v3", status: "in_progress" })];
+    const target = cardRow({ final: cell("after_annotation", "waiting") }, { versions, work });
+    expect(finalizationState(target, now)).toEqual({ state: "waiting", tone: "later" });
+    // A submission on v3 with another v3 task open can be accepted.
+    const current = [annotateItem({ assignment_id: 3, document_id: "case-200-de-v3", status: "submitted" }), ...work];
+    expect(finalizationState({ ...target, work: current }, now)).toEqual({ state: "can be accepted", tone: "now" });
   });
   it("2 of 2 submitted is done and finalization is ready to compare", () => {
     const target = cardRow({ annotation: cell("submitted", "done", { submitted: 2, total: 2 }), final: cell("choose", "decision", { submitted: 2 }) });

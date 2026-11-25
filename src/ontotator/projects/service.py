@@ -34,6 +34,7 @@ from ontotator.ontology.conditions import (
     TranslationResource,
     validate_resources,
 )
+from ontotator.ontology.links import link_template_problem
 from ontotator.ontology.service import OntologyService
 from ontotator.ontology.store import OntologyStore
 from ontotator.ontology.translation_freeze import (
@@ -203,6 +204,13 @@ class ProjectSettingsChange(BaseModel):
     # Issue 298: record working time on annotation and translation review tasks.
     # A factory default keeps the field optional in the generated types.
     record_working_time: bool = Field(default_factory=lambda: False)
+    # Display only: the editor shows `N18.1`, not `ICD10CM:N18.1`, in a project
+    # with one ontology. Stored and exported ids keep their prefix.
+    hide_term_id_prefix: bool = Field(default_factory=lambda: False)
+    # Ontology id -> where its term codes link to, e.g.
+    # ``https://www.icd10data.com/search?s={code}`` (ontology/links.py). An
+    # ontology without one keeps the default link.
+    term_link_templates: dict[str, str] = Field(default_factory=dict)
     hidden_axis_values: HiddenValues = Field(default_factory=dict)
     creation_defaults: CreationDefaults = Field(default_factory=dict)
     # ``None`` keeps the stored value (the settings page sends full replaces).
@@ -232,6 +240,24 @@ class ProjectSettings(ProjectSettingsChange):
     annotations_per_text_max: int | None = None
     # ``None``: not frozen yet, the first use takes the server's translations.
     frozen_translations: FrozenTranslations | None = None
+
+
+def validate_term_link_templates(
+    profile: TaskProfile, templates: Mapping[str, str]
+) -> None:
+    """Every template belongs to an ontology of the profile and is usable."""
+    ontology_ids = {ontology.ontology_id for ontology in profile.ontologies}
+    for ontology_id, template in templates.items():
+        problem = (
+            "Not an ontology of this project."
+            if ontology_id not in ontology_ids
+            else link_template_problem(template)
+        )
+        if problem is not None:
+            raise DomainError(
+                "SETTINGS_INVALID",
+                {"path": f"term_link_templates.{ontology_id}", "problem": problem},
+            )
 
 
 def validate_creation_defaults(
@@ -830,6 +856,13 @@ class ProjectService:
                 del fields[name]
         if "languages" in fields:
             fields["languages"] = sorted(normalize_languages(change.languages))
+        if "term_link_templates" in fields:
+            # An emptied field removes the template: the default link is back.
+            fields["term_link_templates"] = {
+                ontology_id: template.strip()
+                for ontology_id, template in sorted(change.term_link_templates.items())
+                if template.strip()
+            }
         with self.db.transaction() as conn:
             conn.execute(
                 select(func.pg_advisory_xact_lock_shared(_lock_id("members", key)))
@@ -858,6 +891,11 @@ class ProjectService:
                 combined["creation_defaults"],
                 combined["hidden_axis_values"],
             )
+            if "term_link_templates" in fields:
+                validate_term_link_templates(
+                    TaskProfile.model_validate(row["task_profile"]),
+                    fields["term_link_templates"],
+                )
             policy_fields = {
                 "creation_defaults",
                 "require_chosen_axes",

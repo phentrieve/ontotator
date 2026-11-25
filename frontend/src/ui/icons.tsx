@@ -184,11 +184,46 @@ export const IconMore = (p: IconProps) => (
 );
 
 // Lucide "settings" (ISC, https://lucide.dev, see THIRD_PARTY_NOTICES.md); scaled from its 24 px grid, paths verbatim.
+/** A bell: the header's notifications (issue 557). */
+export const IconBell = (p: IconProps) => (
+  <Icon {...p}><path d="M4 11.5V7a4 4 0 0 1 8 0v4.5l1 1H3z" /><path d="M6.5 14.5a1.5 1.5 0 0 0 3 0" /></Icon>
+);
 export const IconGear = (p: IconProps) => (
   <Icon {...p}>
     <g transform="scale(0.6667)" strokeWidth="2.25">
       <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
       <circle cx="12" cy="12" r="3" />
     </g>
+  </Icon>
+);
+
+/** "Show in tree" (issue 540): a term with a broader one above and two narrower ones below. */
+export const IconTree = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="5.75" y="1.75" width="4.5" height="3.5" rx="1" />
+    <rect x="1.75" y="10.75" width="4.5" height="3.5" rx="1" />
+    <rect x="9.75" y="10.75" width="4.5" height="3.5" rx="1" />
+    <path d="M8 5.25V8M4 10.75V8h8v2.75" />
+  </Icon>
+);
+
+/** "Move to a new finding": out of the box, up and to the right. */
+export const IconMoveOut = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M7 3.25H3.75a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9" />
+    <path d="M9.5 2.75h3.75V6.5M13.25 2.75 7.5 8.5" />
+  </Icon>
+);
+
+export const IconPlus = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M8 3v10M3 8h10" />
+  </Icon>
+);
+
+/** "Next open item" where the bar is short of room (issue 539). */
+export const IconArrowRight = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M2.75 8h10M9 4.25 12.75 8 9 11.75" />
   </Icon>
 );

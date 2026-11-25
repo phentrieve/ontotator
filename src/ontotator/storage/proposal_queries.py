@@ -117,3 +117,46 @@ def newest_proposal_counts(
         statement = statement.where(newest.c.layer_id.in_(sorted(layer_ids)))
     rows = conn.execute(statement).all()
     return {document_id: count for document_id, count in rows}
+
+
+def review_item_documents(
+    conn: Connection,
+    project_id: int,
+    layer_ids: Collection[str] | None = None,
+    document_id: str | None = None,
+) -> frozenset[str]:
+    """Documents with needs-review items (#650): proposals a re-anchored set
+    could not carry and that wait for a check on that version.
+
+    A correction that changes the words of every proposal leaves a set with
+    no proposal and only such items. They are work from proposals all the
+    same: a task from proposals on that version shows them under "Needs
+    review after the text change". Proposal counts leave them out; this is
+    the separate "has review inputs" notion. ``layer_ids``: only items of
+    those layers; ``document_id``: only that document."""
+    statement = select(ProposalSetRow.document_id, ProposalSetRow.pending_items).where(
+        ProposalSetRow.project_id == project_id,
+        ProposalSetRow.origin == "reanchor",
+        func.jsonb_array_length(ProposalSetRow.pending_items) > 0,
+    )
+    if document_id is not None:
+        statement = statement.where(ProposalSetRow.document_id == document_id)
+    wanted = None if layer_ids is None else set(layer_ids)
+    return frozenset(
+        row.document_id
+        for row in conn.execute(statement)
+        if wanted is None
+        or any(item.get("layer_id") in wanted for item in row.pending_items)
+    )
+
+
+def has_review_items(
+    conn: Connection,
+    project_id: int,
+    document_id: str,
+    layer_ids: Collection[str] | None = None,
+) -> bool:
+    """Whether ``document_id`` has needs-review items (``review_item_documents``)."""
+    return bool(
+        review_item_documents(conn, project_id, layer_ids, document_id=document_id)
+    )

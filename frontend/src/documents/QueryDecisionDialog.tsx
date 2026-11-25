@@ -1,15 +1,15 @@
 /**
  * The lead decides a translation review submitted as a query (issue 483), from "Resolve…" on the Documents row:
- * - `reviewer_text`, "Accept the reviewer's text…": the reviewer's proposed text, which the lead may still change,
+ * - `reviewer_text`, "Accept the reviewer's text as v2…": the reviewer's proposed text, which the lead may still change,
  *   with its changes against the version; it becomes the next version, accepted. The answer is optional.
- * - `unchanged`, "Answer and accept the version as it is…": the version is accepted unchanged; the answer is required.
+ * - `unchanged`, "Accept v1 as it is…": the version is accepted unchanged; the answer is required.
  * Both are recorded as the lead's decision on the query, and the reviewer reads the answer at the submitted task.
  */
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, type DocumentRowView, type QueryDecisionPreview, type QueryDecisionResult } from "../api/client";
 import { textLabel } from "../app/identity";
 import { ErrorNotice } from "../admin/ErrorNotice";
-import { DiffView } from "../translation/DiffView";
+import { DiffView, scrollToFirstChange } from "../translation/DiffView";
 import { TranslationEditor } from "../translation/TranslationEditor";
 import { diffTextBounded } from "../translation/textDiff";
 import { Button, Dialog, InlineMessage, Textarea } from "../ui";
@@ -17,11 +17,6 @@ import { correctionConsequences } from "./LeadCorrectionPanel";
 import { changedPassages } from "./UploadVersionDialog";
 
 export type QueryDecisionKind = QueryDecisionResult["kind"];
-
-export const QUERY_ACTIONS: Readonly<Record<QueryDecisionKind, string>> = {
-  reviewer_text: "Accept the reviewer’s text…",
-  unchanged: "Answer and accept the version as it is…",
-};
 
 /** Why the query cannot be decided here (`QUERY_DECISION_NOT_AVAILABLE` reasons). */
 export function queryRefusal(reason: string | null | undefined, short: string): string | null {
@@ -31,7 +26,7 @@ export function queryRefusal(reason: string | null | undefined, short: string): 
     case "review_open": return "A translation review of this version is open. Withdraw it with Remove… in the reviewer’s row of the Translation part before you decide the query.";
     case "not_newest": return "A newer version of this translation exists. Reload the row to see it.";
     case "discarded": return "This translation was discarded. Reload the row to see its current state.";
-    case "unchanged": return `This text is the same as ${short}. To accept ${short} without changes, use Answer and accept the version as it is….`;
+    case "unchanged": return `This text is the same as ${short}. To accept ${short} without changes, use Accept ${short} as it is…`;
     case "answer_required": return "Enter the answer to the reviewer.";
     default: return null;
   }
@@ -92,7 +87,8 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
   const short = `v${state?.version ?? row.versions.find(entry => entry.document_id === documentId)?.version ?? 1}`;
   const next = `v${state?.next_version ?? 2}`;
   const taking = kind === "reviewer_text";
-  const title = `${taking ? "Accept the reviewer’s text" : "Answer and accept the version as it is"}, ${textLabel(row)} ${short}`;
+  // Issue 554: the title repeats the label of the button that opened it (named by its consequence).
+  const title = taking ? `Accept the reviewer’s text as ${next}, ${textLabel(row)} ${short}` : `Accept ${short} as it is, ${textLabel(row)}`;
   const value = text ?? "";
   const original = state?.text ?? "";
   const changed = state !== null && value !== original;
@@ -123,6 +119,20 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
   const refusedText = refusedSave(error, short);
   const failure = refusedText ? <InlineMessage tone="warning">{refusedText}</InlineMessage> : error !== undefined && <ErrorNotice error={error} />;
   const close = busy ? undefined : onClose;
+  // Rule 4 of docs/design.md › Panels and actions: a greyed Accept names its reason as description and tooltip.
+  const greyed = state === null ? "Loading the query…" : !invalid ? null
+    : taking ? "Change the text, or accept the version as it is." : "Enter the answer to the reviewer.";
+  const describedBy = greyed === null || busy ? undefined : tried && !taking && state !== null ? `${id}-answer-error` : `${id}-missing`;
+  // Issue 613: "Changes to v1" opens at its first change once the text is there, not at the start of the text.
+  const changesView = useRef<HTMLDivElement>(null), scrolled = useRef(false);
+  const hasChanges = parts !== null;
+  useLayoutEffect(() => {
+    if (!hasChanges || scrolled.current || !changesView.current) return;
+    scrolled.current = true;
+    scrollToFirstChange(changesView.current);
+  }, [hasChanges]);
+  // Rule 6: focus on the primary action when the dialog opens.
+  const primary = useRef<HTMLButtonElement>(null);
 
   if (loadError !== undefined || blocked !== null) {
     return <Dialog open size="sm" title={title} onClose={onClose} returnFocus={returnFocus} footer={<Button onClick={onClose}>Close</Button>}>
@@ -132,15 +142,15 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
 
   const question = state?.review?.rationale?.trim();
   const count = parts ? changedPassages(parts) : null;
-  return <Dialog open size={taking ? "lg" : "md"} title={title} onClose={close} returnFocus={returnFocus}
+  return <Dialog open size={taking ? "lg" : "md"} title={title} onClose={close} returnFocus={returnFocus} initialFocus={primary}
     footer={<>
       <Button disabled={busy} onClick={onClose}>Cancel</Button>
-      <Button variant="primary" loading={busy} aria-disabled={state === null || invalid || busy ? true : undefined}
-        aria-describedby={invalid && tried ? (taking ? `${id}-missing` : `${id}-answer-error`) : undefined} onClick={() => { void save(); }}>{taking ? `Accept as ${next}` : `Accept ${short}`}</Button>
+      <Button ref={primary} variant="primary" loading={busy} aria-disabled={state === null || invalid || busy ? true : undefined}
+        aria-describedby={describedBy} title={busy ? undefined : greyed ?? undefined} onClick={() => { void save(); }}>{taking ? `Accept as ${next}` : `Accept ${short}`}</Button>
     </>}>
     <div className="editorial-correction query-decision">
       {state === null
-        ? <InlineMessage tone="info">Loading the query…</InlineMessage>
+        ? <InlineMessage tone="info"><span id={`${id}-missing`}>Loading the query…</span></InlineMessage>
         : <>
           <div className="documents-review-reason">
             <p>{`${reviewer} asked a question about ${short}.`}</p>
@@ -149,16 +159,17 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
           {taking
             ? <>
               <p>{`The text below becomes ${next}, a correction of ${short}, and is accepted. It is recorded as your decision on the query.`}</p>
+              {/* Issue 613: the changes first, opened at the first one (as Show the proposed text, issue 591), then the text to edit. */}
+              {parts !== null && <div className="editorial-correction-changes">
+                <p className="upload-version-changes"><strong>{`Changes to ${short}`}</strong>{count !== null && ` · ${count} ${count === 1 ? "passage" : "passages"} changed`}</p>
+                <DiffView ref={changesView} before={original} after={value} parts={parts} lang={row.language} />
+              </div>}
               <div className="form-group">
                 <label id={`${id}-text-label`} htmlFor={`${id}-text`} className="form-label">Reviewer’s text</label>
                 <TranslationEditor id={`${id}-text`} labelledBy={`${id}-text-label`} describedBy={`${id}-text-hint`} machineText={original} value={value}
                   lang={row.language} disabled={busy} onChange={event => { setText(event.target.value); setError(undefined); }} />
                 <p id={`${id}-text-hint`} className="field-hint">{edited ? "You changed the reviewer’s text. The record says so." : "You can still change the text here."}</p>
               </div>
-              {parts !== null && <div className="editorial-correction-changes">
-                <p className="upload-version-changes"><strong>{`Changes to ${short}`}</strong>{count !== null && ` · ${count} ${count === 1 ? "passage" : "passages"} changed`}</p>
-                <DiffView before={original} after={value} parts={parts} lang={row.language} />
-              </div>}
               {changed && parts === null && <p className="field-hint">The texts differ too much to mark the changes.</p>}
               {!changed && <InlineMessage tone="warning">{queryRefusal("unchanged", short)}</InlineMessage>}
               {consequences.length > 0 && <InlineMessage tone="warning" title={annotated ? `Annotation has work on ${short}.` : `${short} has work.`}>
@@ -176,7 +187,10 @@ export function QueryDecisionDialog({ kind, row, documentId, projectKey, reviewe
         </>}
       {failure}
       {/* Without an answer the field says so itself; the button points there, not to a second copy (issue 547, U2-05). */}
-      {invalid && tried && taking && <p id={`${id}-missing`} className="action-reason">Change the text, or accept the version as it is.</p>}
+      {/* Before a press the reason is the button's description only; after it, it shows in place. */}
+      {state !== null && greyed !== null && (tried && taking
+        ? <p id={`${id}-missing`} className="action-reason">{greyed}</p>
+        : !tried && <span id={`${id}-missing`} hidden>{greyed}</span>)}
     </div>
   </Dialog>;
 }

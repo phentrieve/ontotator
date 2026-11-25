@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
-from typing import cast
+from typing import Any, cast
 
 from sqlalchemy import Connection, and_, exists, func, or_, select
 from sqlalchemy.sql.elements import ColumnElement
@@ -34,6 +34,19 @@ class DocumentFilter:
 def current_access(
     conn: Connection, access: Access, project_id: int, project_key: str
 ) -> Access:
+    if access.system_operator:
+        # Issue 635: the CLI operator has no user row to reload; it stays a
+        # system admin, still without a membership or a practice project.
+        practice_project = conn.execute(
+            select(ProjectRow.practice).where(ProjectRow.id == project_id)
+        ).scalar()
+        return Access(
+            access.user_id,
+            access.pseudonym,
+            True,
+            practice=frozenset({project_key}) if practice_project else frozenset(),
+            system_operator=True,
+        )
     # One statement: this runs several times per editor request.
     roles_of = (
         select(func.array_agg(ProjectMembershipRow.role))
@@ -325,13 +338,17 @@ def project_document_filters(
     conn: Connection, access: Access
 ) -> dict[str, DocumentFilter]:
     """All currently visible projects in three bounded queries."""
-    user = (
-        conn.execute(select(UserRow).where(UserRow.id == access.user_id))
-        .mappings()
-        .one_or_none()
-    )
-    if user is None or not user["active"]:
-        return {}
+    if access.system_operator:
+        # Issue 635: no user row to reload; see ``current_access``.
+        user: Any = {"pseudonym": access.pseudonym, "is_system_admin": True}
+    else:
+        user = (
+            conn.execute(select(UserRow).where(UserRow.id == access.user_id))
+            .mappings()
+            .one_or_none()
+        )
+        if user is None or not user["active"]:
+            return {}
     rows = conn.execute(
         select(ProjectRow.id, ProjectRow.project_key, ProjectMembershipRow.role)
         .outerjoin(

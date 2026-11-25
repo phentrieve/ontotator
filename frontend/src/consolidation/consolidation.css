@@ -144,6 +144,13 @@
   overflow: auto;
 }
 
+/* Room for the frame of a selected group at the edge of the text (U4-06): the scroll box reaches 4 px into the
+   pane's padding on each side, so the text itself stays where it was. */
+.cons-text-scroll {
+  margin-inline: -4px;
+  padding-inline: 4px;
+}
+
 .cons-side {
   display: grid;
   gap: var(--space-3);
@@ -196,7 +203,12 @@
   text-underline-offset: 3px;
 }
 
+/* The selected group: one frame around its adjacent pieces (issue 548, U4-06), one box per line of text. The wrapper
+   reaches as low as its pieces (their 16 px padding), so the frame holds the lanes as before. */
 .cons-selected {
+  padding-bottom: 16px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
   outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-radius: var(--radius-sm);
@@ -241,6 +253,7 @@
 }
 
 .cons-legend-swatch.cons-selected {
+  padding-bottom: 0;
   outline-offset: -2px;
 }
 

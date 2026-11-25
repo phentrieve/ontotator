@@ -184,7 +184,7 @@ The text is not in the work plan. Plan it first. See [Add a text to the plan](le
 
 ### "This person already submitted this review. To let them review it again, use Reopen."
 
-You assigned a translation review to someone who already reviewed this version, for example after they rejected it. A second assignment is not possible; reopen their review instead: **Resolve…**, then the reopen item, for example *Reopen Ana Weber's review…*. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
+You assigned a translation review to someone who already reviewed this version, for example after they rejected it. A second assignment is not possible; reopen their review instead: **Resolve…**, then **Other ways…** and the reopen item, for example *Reopen Ana Weber's review…*. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
 
 ### "This version can no longer be accepted here."
 
@@ -194,21 +194,29 @@ You assigned a translation review to someone who already reviewed this version, 
 
 **Upload a corrected text…** was refused when you saved: a newer version of the translation arrived meanwhile, the translation was discarded, or a translation review of the version was assigned. The dialog names the reason. Close it and look at the version list again; your text is not saved, so keep it. See [Upload a new version of a translation](lead-results.md#upload-a-new-version-of-a-translation).
 
-### "Fix typos…" did not save
+### "Fix typos" did not save
 
-**Fix typos…** did not save: a newer version arrived, a translation review of the version is open, it was discarded, or the text is the same as before. The dialog names the reason; your text stays in the dialog until you close it. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+The typo fix (**Edit the translation…** › **Only spelling, spacing or grammar**, or **Fix typos (no review)…**) did not save: a newer version arrived, a translation review of the version is open, it was discarded, or the text is the same as before. The dialog names the reason; your text stays in the dialog until you close it. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
 
 ### "This query can no longer be decided here."
 
-**Accept the reviewer’s text…** or **Answer and accept the version as it is…** was refused: the query was already decided, a newer version of the translation arrived, the translation was discarded, or a translation review of the version is open (withdraw it with **Remove…** first). The dialog names the reason. Reload the row to see its current state. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
+**Accept the reviewer’s text as v2…** or **Accept v1 as it is…** was refused: the query was already decided, a newer version of the translation arrived, the translation was discarded, or a translation review of the version is open (withdraw it with **Remove…** first). The dialog names the reason. Reload the row to see its current state. See [Resolve a rejected or queried translation](lead-results.md#resolve-a-rejected-or-queried-translation).
+
+### "This question cannot be answered this way."
+
+The answer to a question was refused, and the question may have been answered already; reload the page. When the wording could not be taken, the dialog says so instead: *The quoted passage is no longer in the reviewer's text, so the wording cannot be taken.* (the passage is not in their text exactly once) or *The reviewer's review is no longer open…*. Untick **Take the proposed wording into the reviewer's text** and send the answer without it. See [Answer a question](lead-results.md#answer-a-question).
+
+### "The question could not be sent."
+
+**Send question** was refused: a wording needs a quoted passage, and passage and wording may have at most 2000 characters each. See [Ask the lead](annotator.md#ask-the-lead).
 
 ### "Nothing can be added to this reason any more."
 
 **Add to the reason…** was refused: the reviewer submitted the review, the task was removed, or the task is no longer the one you asked for with **Ask a reviewer to correct…**. An addition is possible only while the requested review is open. Reload the row to see its current state. See [Add to the reason of a correction request](lead-documents.md#add-to-the-reason-of-a-correction-request).
 
-### A review of a version cannot be reopened or assigned after "Fix typos…"
+### A review of a version cannot be reopened or assigned after a typo fix
 
-*A lead fixed typos in this version: v2 is the text to review. Assign a review of the newest version.* A translation review always reviews the corrected text. In the row, use **Assign review…** or **Resolve…** › **Assign a new review…**; the person who reviewed the earlier version can be chosen again. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
+*A lead fixed typos in this version: v2 is the text to review. Assign a review of the newest version.* A translation review always reviews the corrected text. In the row, use **Assign review…** or **Resolve…** › **Other ways…** › **Assign a new review…**; the person who reviewed the earlier version can be chosen again. See [Fix a typo in a translation without a review](lead-results.md#fix-a-typo-in-a-translation-without-a-review).
 
 ### A task is still paused after I closed the report
 

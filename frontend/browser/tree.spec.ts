@@ -509,8 +509,15 @@ test.describe("ontology tree", () => {
     // Given up, the tree is back where it was, on the same walk.
     await page.locator(".inspector-pane").getByRole("button", { name: "Discard", exact: true }).click();
     await expect(panel).toBeVisible();
-    expectSameBox(await box(host), tree);
-    expectSameBox(await box(page.locator(".inspector-pane")), inspector);
+    // In the same column, down to the bottom. With the one header bar (issue 539) the column is high enough that the
+    // panel follows its content between its 40 % and what the tree leaves: with nothing selected now, the tree gets the
+    // few pixels the panel does not need, and the two still meet.
+    const backTree = await box(host), backInspector = await box(page.locator(".inspector-pane"));
+    for (const side of ["x", "width"] as const) expect(Math.abs(backTree[side] - tree[side])).toBeLessThan(1);
+    expect(Math.abs(backTree.y + backTree.height - (tree.y + tree.height))).toBeLessThan(1);
+    expect(Math.abs(backInspector.y + backInspector.height - backTree.y)).toBeLessThanOrEqual(1);
+    expect(backInspector.y).toBe(inspector.y);
+    expect(backInspector.height).toBeGreaterThanOrEqual(0.4 * (text.height) - 1);
     await expect(treeItem(page, SEIZURE)).toHaveAttribute("aria-selected", "true");
     await expect(treeItem(page, STATUS_EPILEPTICUS)).toHaveAttribute("aria-current", "true");
     expect(opens).toEqual([]);
@@ -530,9 +537,10 @@ test.describe("ontology tree", () => {
     for (let index = 0; index < Math.min(shown, 4); index += 1) {
       await expect(cards.nth(index)).toBeInViewport({ ratio: 1 });
     }
-    // All of them fit where the docked tree would have left room for none.
+    // All of them fit in the column, which the search has to itself (with the one header bar of issue 539 the four
+    // hits now fit even above the line where the tree started).
     const lastCard = await box(cards.nth(Math.min(shown, 4) - 1));
-    expect(lastCard.y + lastCard.height).toBeGreaterThan(tree.y);
+    expect(lastCard.y + lastCard.height).toBeLessThanOrEqual(column.y + column.height + 1);
     expectSameBox(await box(page.locator(".inspector-pane")), column);
     await cards.last().scrollIntoViewIfNeeded();
     await expect(cards.last()).toBeInViewport({ ratio: 1 });

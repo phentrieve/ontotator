@@ -1,10 +1,11 @@
 import { IconButton } from "../ui/IconButton";
-import { IconCheck, IconClose } from "../ui/icons";
+import { IconCheck, IconClose, IconTree } from "../ui/icons";
 import { Button } from "../ui/Button";
 import { FilterChip } from "../ui/FilterChip";
 import { InlineMessage } from "../ui/InlineMessage";
 import { Kbd } from "../ui/Kbd";
 import { useShortcutHint } from "../ui/shortcuts";
+import { useTouchOnly } from "../ui/useMediaQuery";
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { SearchCandidate } from "../api/client";
 import { SearchLanguageButton } from "./SearchLanguageButton";
@@ -13,6 +14,7 @@ import { SearchManager, type SearchState, type WorkspaceKey } from "./searchStat
 import { PREFILL_SELECTED, firstUsableIndex, keepsPrefillSelected, matchLine } from "./termSearch";
 import { COHORT_TAG, MODIFIER_ROOTS } from "./modifiers";
 import "./modifiers.css";
+import { useTermIdDisplay } from "./termIds";
 
 export interface SearchPanelProps {
   canAssign?: boolean;
@@ -45,6 +47,8 @@ export interface SearchPanelProps {
   modifierFilter?: boolean;
   /** Issue 523: "Show in tree" at the active hit opens the ontology tree there, only to look. */
   onShowInTree?: (candidate: SearchCandidate) => void;
+  /** The ontology tree is open under the panel (issue 589): when it opens, the active hit is brought into view. */
+  treeShown?: boolean;
 }
 
 /** Reason line of a modifier hit in "Change term" and the tree: allowed, but usually a modifier (some name a finding, e.g. Stillbirth). */
@@ -77,8 +81,12 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   onPickModifier,
   modifierFilter = false,
   onShowInTree,
+  treeShown = false,
 }) => {
+  const showTermId = useTermIdDisplay();
   const [modifiersOnly, setModifiersOnly] = useState(false);
+  // Touch: the hint says "tap", and a finger that scrolls the list does not make the hit under it active (issue 612).
+  const touchOnly = useTouchOnly();
   // "Modifiers only" switched on by the `mod:` prefix: an emptied field switches it off again.
   const modifiersFromPrefix = useRef(false);
   const offerModifierFilter = modifierFilter && mode === "finding";
@@ -227,6 +235,14 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     if (shownActive < 0) return;
     listRef.current?.querySelector<HTMLElement>(`[data-option-index="${shownActive}"]`)?.scrollIntoView?.({ block: "nearest" });
   }, [shownActive]);
+  // Issue 589: the tree opened under the panel takes most of a column of 1280 × 720, and the panel's top (the term,
+  // the mark, the field) filled what was left: no hit was in view. The active hit, the one "Show in tree" was used
+  // on, scrolls into the panel's view; the field may leave it for as long as the tree is open.
+  useLayoutEffect(() => {
+    if (!treeShown || shownActive < 0) return;
+    listRef.current?.querySelector<HTMLElement>(`[data-option-index="${shownActive}"]`)?.scrollIntoView?.({ block: "nearest" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the tree's opening moves the panel
+  }, [treeShown]);
   // A short stacked pane can leave the first hit below its edge: bring it in, the field stays in view above it.
   useEffect(() => {
     if (expanded) listRef.current?.firstElementChild?.scrollIntoView?.({ block: "nearest" });
@@ -380,7 +396,8 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
           ) : expanded ? (
             anyUsable ? (
               <>
-                {hitCount}, {shownActive < 0 && "no close match, "}<Kbd>↓</Kbd><Kbd>↑</Kbd> choose, <Kbd>Enter</Kbd> add, <Kbd>Esc</Kbd> cancel
+                {hitCount}, {shownActive < 0 && "no close match, "}{touchOnly ? "tap a term to add it"
+                  : <><Kbd>↓</Kbd><Kbd>↑</Kbd> choose, <Kbd>Enter</Kbd> add, <Kbd>Esc</Kbd> cancel</>}
               </>
             ) : (
               hitCount
@@ -415,7 +432,9 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                 className={`candidate-card${cand.obsolete ? " candidate-obsolete" : ""}`}
                 // Keep the focus in the field: the hits are options of the combobox, not buttons.
                 onMouseDown={(event) => event.preventDefault()}
-                onPointerEnter={() => {
+                onPointerEnter={(event) => {
+                  // A finger that starts a swipe on a hit only scrolls the list: the active hit stays (issue 612).
+                  if (event.pointerType === "touch") return;
                   // A pointer resting where the list appears must not arm a weak match for Enter.
                   if (usable && !isActive && !cand.weak_match) setActive({ list: state.candidates, index });
                 }}
@@ -423,7 +442,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
               >
                 <div className="candidate-header">
                   <strong className="candidate-label" title={cand.label}>{cand.label}</strong>
-                  <span className="candidate-id">{cand.term_id}</span>
+                  <span className="candidate-id" title={cand.term_id}>{showTermId(cand.term_id)}</span>
                   {isModifierHit(cand) && <span className="candidate-role">{cand.role === "cohort" ? COHORT_TAG : "Modifier"}</span>}
                   {cand.weak_match && <span className="candidate-role">Weak match</span>}
                   {canAssign && (
@@ -459,11 +478,14 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
         // preview of another length never moves the rows under the pointer. A long definition scrolls inside the
         // pane, so it is a named region in the Tab order: a keyboard user can reach it and scroll it with the arrows.
         <section className="candidate-preview" data-testid="candidate-preview" aria-labelledby={`${listboxId}-preview`} tabIndex={0}>
-          <div id={`${listboxId}-preview`} className="candidate-preview-title">{`Definition of ${candidates[shownActive].label} (${candidates[shownActive].term_id})`}</div>
-          {onShowInTree && <Button type="button" size="sm" variant="secondary" className="annotation-tree-button"
-            aria-label={`Show in tree: ${candidates[shownActive].label}`}
-            title="Show this term in the ontology tree, only to look: broader and narrower terms"
-            onClick={() => onShowInTree(candidates[shownActive])}>Show in tree</Button>}
+          {/* The title and "Show in tree" share one row (issue 540). */}
+          <div className="candidate-preview-head">
+            <div id={`${listboxId}-preview`} className="candidate-preview-title">{`Definition of ${candidates[shownActive].label} (${showTermId(candidates[shownActive].term_id)})`}</div>
+            {onShowInTree && <IconButton size="sm" variant="quiet" className="annotation-tree-button" icon={<IconTree />}
+              label={`Show in tree: ${candidates[shownActive].label}`}
+              title="Show in tree, only to look: broader and narrower terms"
+              onClick={() => onShowInTree(candidates[shownActive])} />}
+          </div>
           <p className="candidate-preview-text">{candidates[shownActive].definition || "This term has no definition in the ontology."}</p>
         </section>
       )}

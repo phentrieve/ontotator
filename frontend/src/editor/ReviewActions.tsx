@@ -7,7 +7,7 @@ import type { EditorProposal, AnnotationSnapshot } from "../api/client";
 import type { components } from "../api/generated";
 import { TermName } from "./TermName";
 import { AiBadge } from "./AiBadge";
-import { IconCheck, IconClose, IconPencil, IconQuestion, IconUndo, IconWarning } from "../ui/icons";
+import { IconCheck, IconClose, IconMoveOut, IconPencil, IconQuestion, IconTree, IconUndo, IconWarning } from "../ui/icons";
 import { findingAxes } from "./axisLabels";
 import { AxisValue } from "../ui/AxisValue";
 import type { AxisDefinition } from "./AnnotationPanel";
@@ -249,9 +249,12 @@ export const ReviewActions: React.FC<ReviewActionsProps> = ({
       </div>
 
       <div className="detail-section review-actions__proposal" aria-label="Proposal details" tabIndex={-1}>
-        <strong className="review-actions__term"><TermName termId={target.term_id ?? target.annotation_id} label={termLabel} /></strong>
-        {onShowInTree && target.term_id && <>{" "}<Button type="button" variant="secondary" size="sm" className="annotation-tree-button"
-          title="Show this term in the ontology tree: broader and narrower terms" onClick={onShowInTree}>Show in tree</Button></>}
+        {/* The term and its small action in one row (issue 540). */}
+        <div className="review-actions__term-row">
+          <strong className="review-actions__term"><TermName termId={target.term_id ?? target.annotation_id} label={termLabel} /></strong>
+          {onShowInTree && target.term_id && <IconButton variant="quiet" size="sm" className="annotation-tree-button" label="Show in tree"
+            icon={<IconTree />} title="Show in tree: broader and narrower terms of this term" onClick={onShowInTree} />}
+        </div>
         {/* #20: the evidence and its source right under the term, before the values and modifiers. */}
         {evidence.length ? evidence.map((ev, index) => {
           const quote = quoteOf(documentText, ev.mention.segments);
@@ -263,9 +266,9 @@ export const ReviewActions: React.FC<ReviewActionsProps> = ({
               onClick={() => onShowMention(ev)}>{quote}</button> : quote}
             {/* As for a finding's mention: the passage to look up elsewhere, several segments joined by a space. */}
             {" "}<CopyTextButton text={quoteOf(documentText, ev.mention.segments, " ")} onAnnounce={onCopyAnnounce} />
-            {onMoveMention && !readOnly && evidence.length > 1 && <>{" "}<Button size="sm" aria-label={`Move mention ${index + 1} to a new finding`}
-              title="Runs Edit & Replace: your copy keeps the other mentions, this one becomes its own finding"
-              onClick={() => onMoveMention(index)}>Move to a new finding</Button></>}
+            {onMoveMention && !readOnly && evidence.length > 1 && <>{" "}<IconButton variant="quiet" size="sm" label={`Move mention ${index + 1} to a new finding`}
+              icon={<IconMoveOut />} title="Move to a new finding: runs Edit & Replace; your copy keeps the other mentions, this one becomes its own finding"
+              onClick={() => onMoveMention(index)} /></>}
           </p>
           {sentence && <p className="review-actions__sentence"><span className="visually-hidden">In the text: </span>
             {sentence.map((part, at) => part.marked ? <mark key={at}>{part.text}</mark> : <span key={at}>{part.text}</span>)}</p>}

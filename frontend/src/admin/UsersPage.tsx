@@ -76,6 +76,8 @@ const auditActions: Readonly<Record<string, string>> = {
   "problem.extend_hold": "Tasks paused for a problem",
   "problem.reopen": "Problem reopened",
   "problem.report": "Problem reported",
+  "question.ask": "Asked the lead",
+  "question.answer": "Answered a question",
   "problem.resolve": "Problem resolved",
   "problem.restart": "Task restarted after a problem",
   "problem.resume": "Tasks resumed after a problem",
@@ -143,6 +145,8 @@ export const fieldLabels: Readonly<Record<string, string>> = {
   contiguous_mentions_only: "A finding must be one continuous passage",
   creation_defaults: "Prefilled values",
   hidden_axis_values: "Values annotators can choose",
+  hide_term_id_prefix: "Show codes without the ontology prefix",
+  term_link_templates: "Term codes",
   pins: "Ontology version",
   profile: "Task profile",
   display_name: "Display name",
@@ -208,6 +212,41 @@ function pauseDetails(action: "text.pause" | "text.release", details: Record<str
     typeof details.via === "string" && `Via: ${labelFor(VIA_LABELS, details.via)}`,
   ].filter(Boolean).join("; ");
 }
+/** A changed passage in quotes, its middle cut beyond 60 characters; spaces stay visible inside the quotes. */
+function passage(text: string): string {
+  const shown = text.length > 60 ? `${text.slice(0, 28)}…${text.slice(-28)}` : text;
+  return `“${shown}”`;
+}
+/** One passage of a typo fix: "“Ataxie” → “Ataxia”", or what was added or removed. */
+function passageChange(item: unknown): string | null {
+  if (item === null || typeof item !== "object") return null;
+  const { old_text: was, new_text: now } = item as { old_text?: unknown; new_text?: unknown };
+  const before = typeof was === "string" ? was : "", after = typeof now === "string" ? now : "";
+  if (!before && !after) return null;
+  return !before ? `added ${passage(after)}` : !after ? `removed ${passage(before)}` : `${passage(before)} → ${passage(after)}`;
+}
+/**
+ * "Reason: Typo; Changed: “Ataxie” → “Ataxia”; New version: v3; 1 task followed the new version; 2 annotations
+ * moved to v3" for a lead's typo fix (Edit the translation… › Only spelling, spacing or grammar; issue 629). The hashes
+ * and character offsets stay in the audit record; the text is under Whom.
+ */
+function typoFixDetails(details: Record<string, unknown>): string {
+  const diff = Array.isArray(details.diff) ? details.diff.map(passageChange).filter((item): item is string => item !== null) : [];
+  const shown = diff.slice(0, 3);
+  const more = diff.length - shown.length;
+  const version = typeof details.version === "number" ? `v${details.version}` : null;
+  const following = typeof details.tasks_following === "number" ? details.tasks_following : 0;
+  const staying = Array.isArray(details.tasks_staying) ? details.tasks_staying.length : 0;
+  const carried = typeof details.annotations_carried === "number" ? details.annotations_carried : 0;
+  return [
+    typeof details.reason === "string" && details.reason.trim() && `Reason: ${details.reason.trim()}`,
+    shown.length > 0 && `Changed: ${shown.join(", ")}${more > 0 ? ` and ${plural(more, "more passage")}` : ""}`,
+    version && `New version: ${version}`,
+    following > 0 && `${plural(following, "task")} followed the new version`,
+    staying > 0 && `${plural(staying, "task")} stayed on the old version`,
+    carried > 0 && `${plural(carried, "annotation")} moved to ${version ?? "the new version"}`,
+  ].filter(Boolean).join("; ");
+}
 const isBlank = (value: unknown): boolean =>
   value === null || value === undefined || value === "" || (Array.isArray(value) ? value.length === 0 : typeof value === "object" && Object.keys(value).length === 0);
 const auditValue = (key: string, value: unknown): string =>
@@ -231,6 +270,7 @@ export function auditDetails(event: AuditEvent, userNames?: ReadonlyMap<number, 
   if (typeof details.is_system_admin === "boolean") return details.is_system_admin ? "Granted" : "Withdrawn";
   if (event.action === "user.languages") return languageChange(details);
   if (event.action === "text.pause" || event.action === "text.release") return pauseDetails(event.action, details);
+  if (event.action === "translation.editorial_correction") return typoFixDetails(details);
   if (Array.isArray(details.fields)) return changedFields(details.fields, details.changes);
   // A move to the newest translations: the files, not the kept conditions (issue 254).
   if (event.action === "project.translations_refresh") return auditEntries({ added: details.added, replaced: details.replaced, removed: details.removed }).join("; ");

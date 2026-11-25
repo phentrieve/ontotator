@@ -4,13 +4,14 @@ import { saveDownload } from "../api/download";
 import { Button, Checkbox, InlineMessage, Select } from "../ui";
 import { ErrorNotice } from "./ErrorNotice";
 import { ExportFailure } from "./ExportFailure";
-import { routeHref } from "../app/router";
+import { parseRoute, routeHref } from "../app/router";
 import { FINAL_SELECTION_CHANGED } from "../variants/finalSelectionState";
 import { useJob } from "./useJob";
 import { Time } from "../app/Time";
 
 type Row = { case_id: string; language: string };
-type Line = Row & { why: string };
+/** `questions`: the text waits for the lead's answer to a question, which is given on the Questions page (issue 590). */
+type Line = Row & { why: string; questions?: boolean };
 const rowKey = (row: Row) => JSON.stringify([row.case_id, row.language]);
 /** Every omission also arrives as this warning; it is listed under "Left out", not under "Needs your decision". */
 const LEFT_OUT = "MISSING_FINAL_SELECTION";
@@ -25,8 +26,11 @@ function Group({ projectKey, title, lines, muted = false }: { projectKey: string
     {(all ? lines : lines.slice(0, SHOWN_ROWS)).map((line, index) => <tr key={`${rowKey(line)}-${index}`}>
       <td>{line.case_id} {line.language}</td>
       <td className={muted ? "cell-muted" : undefined}>{line.why}</td>
-      <td><a className="btn btn-secondary btn-sm" aria-label={`Open in Documents, ${line.case_id} ${line.language}`}
-        href={routeHref({ name: "projectDocuments", key: projectKey, case: line.case_id, language: line.language })}>Open in Documents</a></td>
+      <td>{line.questions
+        ? <a className="btn btn-secondary btn-sm" aria-label={`Open Questions, ${line.case_id} ${line.language}`}
+          href={routeHref({ name: "projectQuestions", key: projectKey })}>Open Questions</a>
+        : <a className="btn btn-secondary btn-sm" aria-label={`Open in Documents, ${line.case_id} ${line.language}`}
+          href={routeHref({ name: "projectDocuments", key: projectKey, case: line.case_id, language: line.language })}>Open in Documents</a>}</td>
     </tr>)}
     {!all && lines.length > SHOWN_ROWS && <tr><td colSpan={3}><Button size="sm" onClick={() => setAll(true)}>Show all {lines.length}</Button></td></tr>}
   </tbody>;
@@ -157,7 +161,9 @@ function FinalExportContent({ projectKey }: { projectKey: string }): JSX.Element
   // One row per text, whatever number of warnings it has.
   const decisions = [...decided].map(key => {
     const lines = warnings.filter(warning => rowKey(warning) === key);
-    return { ...lines[0], why: [...new Set(lines.map(warning => warning.reason))].join(" ") };
+    // Issue 590: when every cause of the text is a question that waits for the answer, the action is on the Questions page.
+    const questions = lines.every(warning => parseRoute(warning.destination).name === "projectQuestions");
+    return { ...lines[0], why: [...new Set(lines.map(warning => warning.reason))].join(" "), questions };
   });
   // One row per text: a text that needs a decision is not listed again under "Left out".
   const leftOut = (state?.omissions ?? []).filter(row => !decided.has(rowKey(row)));

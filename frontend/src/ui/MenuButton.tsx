@@ -30,16 +30,26 @@ export interface MenuButtonProps {
 }
 
 type Box = { width: number; height: number };
+export type MenuPlace = { top: number; left: number; maxHeight: number };
+/** Below this much room on either side the menu covers its button and uses the window's height. */
+const MIN_ROOM = 120;
 /**
- * Where a fixed menu opens: below the trigger, right edges aligned; above it when it does not fit below
- * and there is more room above; always clamped into the viewport.
+ * Where a fixed menu opens: below the trigger, right edges aligned; above it when it does not fit below but fits
+ * above. Taller than the room on either side, it takes the side with more room and scrolls (`maxHeight`); it never
+ * covers its trigger unless both sides are very short. Always inside the viewport.
  */
-export function menuPosition(trigger: { top: number; bottom: number; right: number }, menu: Box, viewport: Box, gap = 4): { top: number; left: number } {
-  const below = trigger.bottom + gap;
-  const above = trigger.top - gap - menu.height;
-  const top = below + menu.height <= viewport.height || viewport.height - below >= trigger.top - gap ? below : above;
+export function menuPosition(trigger: { top: number; bottom: number; right: number }, menu: Box, viewport: Box, gap = 4): MenuPlace {
   const clamp = (value: number, max: number) => Math.max(gap, Math.min(value, max - gap));
-  return { top: clamp(top, viewport.height - menu.height), left: clamp(trigger.right - menu.width, viewport.width - menu.width) };
+  const left = clamp(trigger.right - menu.width, viewport.width - menu.width);
+  const below = viewport.height - trigger.bottom - 2 * gap;
+  const above = trigger.top - 2 * gap;
+  if (menu.height <= below) return { top: trigger.bottom + gap, left, maxHeight: below };
+  if (menu.height <= above) return { top: trigger.top - gap - menu.height, left, maxHeight: above };
+  if (Math.max(below, above) >= MIN_ROOM) return below >= above
+    ? { top: trigger.bottom + gap, left, maxHeight: below }
+    : { top: gap, left, maxHeight: above };
+  const whole = viewport.height - 2 * gap;
+  return { top: Math.max(gap, viewport.height - gap - Math.min(menu.height, whole)), left, maxHeight: whole };
 }
 
 /**
@@ -52,7 +62,7 @@ export function MenuButton({ label, items, buttonLabel, icon, content, className
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const menuId = useId();
-  const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [position, setPosition] = useState<MenuPlace | null>(null);
   const menuItems = () => [...(menu.current?.querySelectorAll<HTMLButtonElement>("[role^=menuitem]") ?? [])];
 
   useLayoutEffect(() => {
@@ -60,13 +70,39 @@ export function MenuButton({ label, items, buttonLabel, icon, content, className
     // Fixed position: the menu is not clipped by a scrolling table wrapper.
     const place = () => {
       const rect = button.current?.getBoundingClientRect();
-      const size = menu.current?.getBoundingClientRect();
-      if (rect && size) setPosition(menuPosition(rect, size, { width: window.innerWidth, height: window.innerHeight }));
+      const element = menu.current;
+      if (!rect || !element) return;
+      // The height of the whole content, also while a lower maxHeight makes the menu scroll.
+      const size = { width: element.getBoundingClientRect().width, height: element.scrollHeight + element.offsetHeight - element.clientHeight };
+      const next = menuPosition(rect, size, { width: window.innerWidth, height: window.innerHeight });
+      setPosition(now => now && now.top === next.top && now.left === next.left && now.maxHeight === next.maxHeight ? now : next);
     };
     place();
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
-    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+    // Placed again when the content changes after opening, e.g. reasons that load late (issue 585).
+    const resized = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(place);
+    const changed = typeof MutationObserver === "undefined" ? null : new MutationObserver(place);
+    if (menu.current) {
+      resized?.observe(menu.current);
+      changed?.observe(menu.current, { childList: true, subtree: true, characterData: true });
+    }
+    // Placed again when the button itself moves, e.g. a neighbour's label grows once a summary loads (issue 605).
+    let frame = 0;
+    let at = "";
+    const follow = () => {
+      const rect = button.current?.getBoundingClientRect();
+      const now = rect ? `${rect.top} ${rect.bottom} ${rect.right}` : "";
+      if (at && now !== at) place();
+      at = now;
+      frame = requestAnimationFrame(follow);
+    };
+    if (typeof requestAnimationFrame === "function") follow();
+    return () => {
+      window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true);
+      resized?.disconnect(); changed?.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, [open]);
   useLayoutEffect(() => {
     if (!open) return;
@@ -138,7 +174,7 @@ export function MenuButton({ label, items, buttonLabel, icon, content, className
     <Button ref={button} size={size} className={className} aria-label={label} aria-haspopup="menu" aria-expanded={open !== null} aria-controls={open ? menuId : undefined}
       onClick={() => open ? setOpen(null) : setOpen("first")} onKeyDown={onButtonKeyDown}>{content ?? (icon ? <>{icon}<span>{buttonLabel}</span></> : buttonLabel)}</Button>
     {open && <div ref={menu} id={menuId} role="menu" aria-label={label} className="ui-menu" onKeyDown={onMenuKeyDown}
-      style={{ position: "fixed", top: `${position.top}px`, left: `${position.left}px` }}>
+      style={{ position: "fixed", top: `${position?.top ?? 0}px`, left: `${position?.left ?? 0}px`, ...(position ? { maxHeight: `${position.maxHeight}px` } : {}) }}>
       {runs.map((run, index) => run.group === undefined ? run.items.map(entry)
         : <div key={`group-${index}`} role="group" aria-label={run.group} className="ui-menu-group">
           <span className="ui-menu-group-label" aria-hidden="true">{run.group}</span>

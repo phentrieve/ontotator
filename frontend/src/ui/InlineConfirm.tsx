@@ -89,6 +89,8 @@ export function InlineConfirm({
         <Button variant={tone} loading={busy}
           aria-disabled={confirmUnavailable ? true : undefined}
           aria-describedby={confirmUnavailable ? reasonId : undefined}
+          // The reason is the tooltip too (docs/design.md › Panels and actions, rule 4), when it is plain text.
+          title={!busy && typeof confirmUnavailable?.reason === "string" ? confirmUnavailable.reason : undefined}
           onClick={() => { if (confirmUnavailable) onConfirmUnavailable?.(); else onConfirm(); }}>{confirmLabel}</Button>
       </>}
     </div>

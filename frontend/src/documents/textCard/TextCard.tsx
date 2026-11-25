@@ -20,7 +20,7 @@ import { BulkPauseDialog } from "../BulkPauseDialog";
 import { pauseAppliedText } from "../bulkPauseModel";
 import { historyLines } from "../historyLines";
 import { leadPauseLine } from "../labels";
-import { leadSteps, stepLabel } from "../nextStepLabels";
+import { leadSteps, rowStepLabel } from "../nextStepLabels";
 import { isActiveRow } from "../stageLabels";
 import { RouteLink, rowKeyOf } from "../RowCells";
 import { RowActivity } from "../RowActivity";
@@ -148,10 +148,10 @@ function Banners({ row, projectKey, query, reportRoute, onNavigate, steps, canMa
 }
 
 /** The lead's steps of one part (issue 332): "Next step: Resolve rejected translation" and their buttons, at the top of the part. */
-export function PartSteps({ steps }: { steps: readonly CardStep[] }): JSX.Element | null {
+export function PartSteps({ steps, row }: { steps: readonly CardStep[]; row: Pick<DocumentRowView, "versions"> }): JSX.Element | null {
   const id = useId();
   if (!steps.length) return null;
-  const labels = [...new Set(steps.map(({ step }) => stepLabel(step.code)))];
+  const labels = [...new Set(steps.map(({ step }) => rowStepLabel(step, row)))];
   return <div className="text-card-next text-card-steps" role="group" aria-labelledby={id}>
     <p id={id} className="text-card-next-label"><strong>{labels.length > 1 ? "Next steps:" : "Next step:"}</strong> {labels.join(", ")}</p>
     <div className="text-card-actions">{steps.map(({ step, button }, index) => <span key={`${step.code}-${index}`} className="text-card-step">{button}</span>)}</div>
@@ -225,7 +225,7 @@ export function TextCard(props: TextCardProps): JSX.Element {
     // Row-keyed parts drop their busy/error state on ‹ ›; the finalization part is not keyed, so the decision
     // block's "saved, next" message survives its automatic move to the next row.
     const languages = props.onOpenText ? <OtherLanguages row={row} rows={props.rows} canManage={canManage} onOpenText={props.onOpenText} onChangePlan={props.onChangePlan} /> : null;
-    const partProps = (place: SegmentId, stage: PanelStage) => ({ steps: <PartSteps steps={placed(place)} />, actions: props.stageActions?.(stage) });
+    const partProps = (place: SegmentId, stage: PanelStage) => ({ steps: <PartSteps steps={placed(place)} row={row} />, actions: props.stageActions?.(stage) });
     body = <>
       {/* The sheet's "Open text" shares its line with Other languages (issue 332). */}
       {sheet && <div className="text-card-topline">{openText}{languages}</div>}

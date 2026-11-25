@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Ontotator Local API",
-    "version": "0.12.0"
+    "version": "0.15.0"
   },
   "paths": {
     "/api/v1/me/tasks": {
@@ -1980,6 +1980,41 @@
               "default": 0,
               "title": "Offset"
             }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "problem",
+                "question"
+              ],
+              "type": "string",
+              "default": "problem",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "resolved",
+                    "withdrawn"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
           }
         ],
         "responses": {
@@ -2463,6 +2498,163 @@
           }
         },
         "x-ontotator-scope": "admin"
+      }
+    },
+    "/api/v1/me/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "List Notifications",
+        "description": "The caller's newest notifications and the number of unread ones.",
+        "operationId": "list_notifications_api_v1_me_notifications_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/me/notifications/summary": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Notification Summary",
+        "description": "The number of unread notifications (the bell's count).",
+        "operationId": "notification_summary_api_v1_me_notifications_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSummary"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/me/notifications/{notification_id}/read": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark Notification Read",
+        "description": "Mark one notification read; another person's id changes nothing.",
+        "operationId": "mark_notification_read_api_v1_me_notifications__notification_id__read_post",
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Notification Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/me/notifications/read-all": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark All Notifications Read",
+        "description": "Mark every notification read, up to ``up_to`` when given.",
+        "operationId": "mark_all_notifications_read_api_v1_me_notifications_read_all_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkAllReadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
       }
     },
     "/api/v1/translation-reviews/{assignment_id}": {
@@ -12525,6 +12717,15 @@
               }
             ],
             "title": "Own Report Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "problem",
+              "question"
+            ],
+            "title": "Kind",
+            "default": "problem"
           }
         },
         "type": "object",
@@ -12534,7 +12735,7 @@
           "own_report_id"
         ],
         "title": "ActiveHoldView",
-        "description": "An active pause on the owner's task; other people's reports stay unnamed."
+        "description": "An active pause on the owner's task; other people's reports stay unnamed.\n\n``kind`` says what paused it: a problem report, or a question to the lead\nwhose asker chose to pause (issue 553). Only the answer, or the asker's\nown resume, releases the pause of a question."
       },
       "ActorRef": {
         "properties": {
@@ -23697,6 +23898,13 @@
             ],
             "title": "Reason"
           },
+          "missing_languages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Languages"
+          },
           "reviewed_again": {
             "type": "boolean",
             "title": "Reviewed Again"
@@ -23729,6 +23937,7 @@
           "translation_status",
           "available",
           "reason",
+          "missing_languages",
           "reviewed_again",
           "review_on",
           "annotate_accepted_only",
@@ -23810,6 +24019,25 @@
           "password"
         ],
         "title": "LoginRequest"
+      },
+      "MarkAllReadRequest": {
+        "properties": {
+          "up_to": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Up To"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MarkAllReadRequest"
       },
       "Member": {
         "properties": {
@@ -24752,6 +24980,178 @@
           "owner"
         ],
         "title": "NextStepView"
+      },
+      "NotificationList": {
+        "properties": {
+          "unread": {
+            "type": "integer",
+            "title": "Unread"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationView"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unread",
+          "items"
+        ],
+        "title": "NotificationList"
+      },
+      "NotificationSummary": {
+        "properties": {
+          "unread": {
+            "type": "integer",
+            "title": "Unread"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unread"
+        ],
+        "title": "NotificationSummary",
+        "description": "The bell's count."
+      },
+      "NotificationView": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "task_assigned",
+              "task_reopened",
+              "task_released",
+              "text_problem_received",
+              "question_received",
+              "answer_received",
+              "submission_waiting"
+            ],
+            "title": "Kind"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "read": {
+            "type": "boolean",
+            "title": "Read"
+          },
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assignment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Id"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "annotate",
+                  "review",
+                  "translation_review"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "created_at",
+          "read",
+          "project_key",
+          "project_name",
+          "actor",
+          "assignment_id",
+          "task",
+          "case_id",
+          "language",
+          "version",
+          "target_id"
+        ],
+        "title": "NotificationView",
+        "description": "One entry of the bell's list. The app words it from these fields."
       },
       "OldMentionView": {
         "properties": {
@@ -26780,7 +27180,8 @@
               "extend_hold",
               "restart",
               "withdraw",
-              "reopen"
+              "reopen",
+              "answer"
             ],
             "title": "Action"
           },
@@ -26795,6 +27196,11 @@
             },
             "type": "array",
             "title": "Assignment Ids"
+          },
+          "take_proposed_text": {
+            "type": "boolean",
+            "title": "Take Proposed Text",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -26846,6 +27252,48 @@
             "type": "string",
             "minLength": 1,
             "title": "Reason"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "problem",
+              "question"
+            ],
+            "title": "Kind",
+            "default": "problem"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "proposed_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Text"
+          },
+          "pause": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pause"
           }
         },
         "additionalProperties": false,
@@ -27112,6 +27560,80 @@
           "text_paused_by_lead": {
             "type": "boolean",
             "title": "Text Paused By Lead"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "problem",
+              "question"
+            ],
+            "title": "Kind",
+            "default": "problem"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "proposed_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Text"
+          },
+          "pauses": {
+            "type": "boolean",
+            "title": "Pauses",
+            "default": true
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "answered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answered At"
+          },
+          "answered_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonRefView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "took_proposed_text": {
+            "type": "boolean",
+            "title": "Took Proposed Text",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -28148,6 +28670,17 @@
             "type": "boolean",
             "title": "Record Working Time"
           },
+          "hide_term_id_prefix": {
+            "type": "boolean",
+            "title": "Hide Term Id Prefix"
+          },
+          "term_link_templates": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Term Link Templates"
+          },
           "hidden_axis_values": {
             "additionalProperties": {
               "additionalProperties": {
@@ -28325,6 +28858,17 @@
           "record_working_time": {
             "type": "boolean",
             "title": "Record Working Time"
+          },
+          "hide_term_id_prefix": {
+            "type": "boolean",
+            "title": "Hide Term Id Prefix"
+          },
+          "term_link_templates": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Term Link Templates"
           },
           "hidden_axis_values": {
             "additionalProperties": {
@@ -29229,6 +29773,26 @@
             "type": "array",
             "title": "Diff"
           },
+          "suggestions": {
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/TextWindowView"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          },
+          "changed_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextWindowView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "old_segments": {
             "items": {
               "$ref": "#/components/schemas/TextWindowView"
@@ -29648,6 +30212,11 @@
           "own_task": {
             "type": "boolean",
             "title": "Own Task",
+            "default": false
+          },
+          "took_proposed_text": {
+            "type": "boolean",
+            "title": "Took Proposed Text",
             "default": false
           }
         },
@@ -31704,7 +32273,7 @@
               {
                 "items": {
                   "type": "string",
-                  "pattern": "^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$"
+                  "pattern": "^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*$"
                 },
                 "type": "array",
                 "maxItems": 8
@@ -37688,6 +38257,11 @@
             ],
             "title": "Status"
           },
+          "opened": {
+            "type": "boolean",
+            "title": "Opened",
+            "default": false
+          },
           "held": {
             "type": "boolean",
             "title": "Held"
@@ -38413,6 +38987,10 @@
             },
             "type": "array",
             "title": "Modifier Layer Ids"
+          },
+          "hide_term_id_prefix": {
+            "type": "boolean",
+            "title": "Hide Term Id Prefix"
           }
         },
         "additionalProperties": false,

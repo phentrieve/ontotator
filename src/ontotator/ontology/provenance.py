@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
+from ontotator.domain.annotations import CURIE_REGEX
 from ontotator.domain.workspace import WorkspaceKey
 from ontotator.ontology.conditions import Digest, SearchExecution
 
@@ -93,9 +94,9 @@ class SearchRequest(BaseModel):
     languages: list[str] | None = Field(default=None, max_length=32)
     # Only terms in the subtrees of these roots (root included), filtered
     # before the ``k`` cut ("+ Add modifier…"). None: unrestricted.
-    within: (
-        list[Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$")]] | None
-    ) = Field(default=None, max_length=8)
+    within: list[Annotated[str, Field(pattern=CURIE_REGEX)]] | None = Field(
+        default=None, max_length=8
+    )
 
 
 class SearchCandidate(BaseModel):

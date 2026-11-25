@@ -1,25 +1,33 @@
 import { forwardRef, useMemo, type ReactNode } from "react";
 import { paragraphStarts } from "../variants/paragraphs";
-import { invisibleNodes } from "./invisibles";
+import { generatedText, invisibleNodes } from "./invisibles";
 import { diffText, type TextDiffPart } from "./textDiff";
 import "./translation.css";
+
+/**
+ * One piece of a diff: deleted words are generated content (never found or copied), inserted ones are `<ins>`.
+ * With `invisibles`, invisible characters get a visible mark (issue 454).
+ */
+export function diffPartNode(op: TextDiffPart["op"], text: string, key: string, invisibles = false): ReactNode {
+  const deleted = op === "delete";
+  const content = invisibles ? invisibleNodes(text, key, { generated: deleted }) : deleted ? generatedText(text) : text;
+  return deleted ? <del key={key} data-diff-op={op}>{content}</del> : op === "insert" ? <ins key={key} data-diff-op={op}>{content}</ins> : <span key={key} data-diff-op={op}>{content}</span>;
+}
 
 /**
  * Text nodes with hidden paragraph markers for coupled scrolling.
  * Markers address the proposed text: deleted words never advance its coordinates.
  * Without deletions the rendered characters equal `after` exactly.
  * With `invisibles`, spaces, tabs, line ends and other invisible characters get a visible mark (issue 454).
+ * Deleted words are generated content: they look and read as before, but the browser's find matches the
+ * proposed text only, and copying the view gives the proposed text (issue 533).
  */
 export function paragraphNodes(after: string, parts: readonly TextDiffPart[], { deletions = true, invisibles = false } = {}): ReactNode[] {
   const starts = paragraphStarts(after), nodes: ReactNode[] = [];
   let position = 0, paragraph = 0, key = 0;
   const marker = () => nodes.push(<span key={`p${paragraph}`} aria-hidden="true" data-paragraph={paragraph} data-paragraph-offset={starts[paragraph++]} />);
   for (const part of parts) {
-    const chunk = (text: string) => {
-      if (!text) return;
-      const id = `t${key++}`, content = invisibles ? invisibleNodes(text, id) : text;
-      nodes.push(part.op === "delete" ? <del key={id} data-diff-op={part.op}>{content}</del> : part.op === "insert" ? <ins key={id} data-diff-op={part.op}>{content}</ins> : <span key={id} data-diff-op={part.op}>{content}</span>);
-    };
+    const chunk = (text: string) => { if (text) nodes.push(diffPartNode(part.op, text, `t${key++}`, invisibles)); };
     if (part.op === "delete") { if (deletions) chunk(part.text); continue; }
     const points = Array.from(part.text);
     let offset = 0;
@@ -37,6 +45,18 @@ export const DiffView = forwardRef<HTMLDivElement, { before: string; after: stri
   const content = useMemo(() => paragraphNodes(after, parts ?? diffText(before, after), { invisibles: showInvisibles }), [before, after, parts, showInvisibles]);
   return <div ref={ref} className={`translation-diff${showInvisibles ? " show-invisibles" : ""}`} role="region" aria-label={label} tabIndex={0} lang={lang}>{content}</div>;
 });
+
+/**
+ * Scrolls a diff view so that its first change is in sight, with about a third of the view of text above it as
+ * context (issue 591); without a change, or when the change is already in the upper part, nothing moves.
+ */
+export function scrollToFirstChange(view: HTMLElement): void {
+  const mark = view.querySelector<HTMLElement>('[data-diff-op="insert"],[data-diff-op="delete"]');
+  if (!mark) return;
+  const top = mark.getBoundingClientRect().top - view.getBoundingClientRect().top + view.scrollTop;
+  const target = Math.max(0, Math.round(top - view.clientHeight / 3));
+  if (top - view.scrollTop > view.clientHeight / 2 || top < view.scrollTop) view.scrollTop = target;
+}
 
 /** Read-only reading text with paragraph markers, without any editing affordance. */
 export const TextView = forwardRef<HTMLDivElement, { text: string; label: string; lang?: string; showInvisibles?: boolean }>(function TextView({ text, label, lang, showInvisibles = false }, ref) {

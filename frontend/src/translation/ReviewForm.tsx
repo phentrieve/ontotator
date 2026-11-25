@@ -1,7 +1,7 @@
 import { useId } from "react";
 import { Checkbox, Kbd, Textarea } from "../ui";
 import { chooseDecision } from "./decisionOrigin";
-import { categoryLabels, clinicalChangeFacts, clinicalChangeHints, decisionDescriptions, decisionLabels, issueMessages, rationaleHint } from "./labels";
+import { categoryLabels, clinicalChangeFacts, clinicalChangeHints, decisionDescriptions, decisionLabels, issueMessages, OFFERED_DECISIONS, rationaleHint, retiredQueryNote } from "./labels";
 import type {
   ClinicalCategory,
   IssueCode,
@@ -20,13 +20,13 @@ export interface ReviewFormProps {
   /** Text of the auto-selection note (autoNoteText), rendered as role="status" under "Accepted with corrections". */
   autoNote?: string | null;
   readOnly?: boolean;
-  /** Offered decisions; default all four with their number keys. A restricted set shows no number keys. */
+  /** Offered decisions; default the three of OFFERED_DECISIONS with their number keys. A restricted set shows no number keys. */
   decisions?: readonly ReviewDecisionCode[];
   /** Hints that replace `decisionDescriptions` (a lead correction of an accepted version, issue 341 b). */
   descriptions?: Partial<Record<ReviewDecisionCode, string>>;
 }
 
-const allDecisions = Object.keys(decisionLabels) as ReviewDecisionCode[];
+const allDecisions = OFFERED_DECISIONS;
 const categories = Object.keys(categoryLabels) as ClinicalCategory[];
 
 /**
@@ -47,10 +47,12 @@ export function ReviewForm({ value, issues, onChange, onChooseDecision, failedCh
   const numberKeys = decisions === allDecisions;
   const id = useId();
   const decision = value.decision;
-  const implied = decision === "query" || decision === "rejected";
-  const clinical = implied || value.clinical_change === true;
-  const chosen = (value.categories?.length ?? 0) > 0;
-  const showCheckbox = !implied && (value.clinical_change === true || decision === "accepted_corrected");
+  // Issue 590: an editable draft that still holds the retired Query shows its note, not the fields of a decision.
+  const queryDraft = decision === "query" && !readOnly;
+  const implied = (decision === "query" && !queryDraft) || decision === "rejected";
+  const clinical = implied || (!queryDraft && value.clinical_change === true);
+  const chosen = !queryDraft && (value.categories?.length ?? 0) > 0;
+  const showCheckbox = !implied && !queryDraft && (value.clinical_change === true || decision === "accepted_corrected");
   const showCategories = clinical || chosen;
   const showRationale = decision !== undefined || clinical || (value.rationale ?? "") !== "";
 
@@ -85,7 +87,8 @@ export function ReviewForm({ value, issues, onChange, onChooseDecision, failedCh
           option === "accepted_corrected" && <p key="auto-note" role="status" className="review-auto-note">{autoNote ?? ""}</p>,
         ])}
       </fieldset>
-      {implied && <p className="review-fact">{clinicalChangeFacts[decision]}</p>}
+      {decision === "query" && <p className="review-fact" role="note">{retiredQueryNote}</p>}
+      {implied && decision !== "query" && <p className="review-fact">{clinicalChangeFacts[decision]}</p>}
       {showCheckbox && (
         <Checkbox
           id={`${id}-clinical-change`}

@@ -52,6 +52,18 @@ export const stepLabel = (code: StepCode): string => STEP_LABELS[code] ?? code;
 export const actionLabel = (action: RowAction): string => ACTION_LABELS[action] ?? action;
 
 /**
+ * The name of a step on its row: "Carry to v3" names the step's target version, like its button
+ * (`rowActionLabel`, issue 628); every other step reads its `STEP_LABELS` name.
+ */
+export function rowStepLabel(step: NextStepView, row: Partial<Pick<DocumentRowView, "versions">>): string {
+  if (step.code === "carry_text_change") {
+    const target = row.versions?.find(version => version.document_id === step.document_id);
+    if (target) return `Carry to v${target.version}`;
+  }
+  return stepLabel(step.code);
+}
+
+/**
  * The action name of a step on its row: "Choose final" follows the server's `stages.final.detail.label_rule` (the
  * final-result panel's rule, VD16): "accept" reads "Accept result…", "compare" "Compare results…"; without the field
  * one submission reads "Accept result…". A "compare" row in full agreement (`all_match`, also on notes and modifier
@@ -84,10 +96,20 @@ export function stepBlockedReason(step: NextStepView, row: Partial<Pick<Document
   return `Import proposals for ${target ? `v${target.version}` : "the new version"}`;
 }
 
+/**
+ * Annotate work of the row's current versions: not moved to a newer one, and on the newest version of its chain.
+ * Issue 613: a submission on v1 of a text now at v3 (Carry to v3 pending) is not a result of the current text, so it
+ * does not make the text "can be accepted" (the server's Finalization stays "after annotation").
+ */
+export function currentAnnotateWork(row: Pick<DocumentRowView, "work"> & Partial<Pick<DocumentRowView, "versions">>): DocumentRowView["work"] {
+  const older = new Set((row.versions ?? []).filter(version => !version.is_newest_in_chain).map(version => version.document_id));
+  return (row.work ?? []).filter(item => item.task === "annotate" && item.moved_to_version == null && !older.has(item.document_id));
+}
+
 /** Annotate work of the current versions partly submitted, partly open: the card's partial agreement (`earlyFinal`). */
-function annotationsOpen(row: Partial<Pick<DocumentRowView, "work" | "stages">>): boolean {
+function annotationsOpen(row: Partial<Pick<DocumentRowView, "work" | "stages" | "versions">>): boolean {
   if (row.stages?.annotation.state === "consolidating") return false;
-  const work = (row.work ?? []).filter(item => item.task === "annotate" && item.moved_to_version == null);
+  const work = currentAnnotateWork({ work: row.work ?? [], versions: row.versions });
   return work.some(item => item.status === "submitted") && work.some(item => item.status !== "submitted");
 }
 

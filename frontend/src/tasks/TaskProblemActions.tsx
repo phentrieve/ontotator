@@ -7,6 +7,7 @@ import { reportTitle, toolbarEntry } from "../problems/labels";
 import { useTaskReports } from "../problems/useTaskReports";
 import { Button, Dialog, IconWarning, InlineMessage, type MenuItem } from "../ui";
 import { ProblemReportForm } from "./ProblemReportForm";
+import { pausedByProblem } from "./pauseLabels";
 import "../problems/problems.css";
 
 /**
@@ -31,7 +32,8 @@ export function TaskProblemActions({ assignment, textName, onSaveBeforeReport, o
   const headings = useRef(new Map<string, HTMLHeadingElement>());
   const newReport = useRef<HTMLButtonElement>(null);
   const listLabel = useId();
-  const entry = toolbarEntry(reports, assignment.held);
+  // Issue 590: a pause from the owner's own question is not a text problem; the entry does not show it as one.
+  const entry = toolbarEntry(reports, pausedByProblem(assignment));
   const marking = useRef(new Set<string>());
 
   const openDialog = () => {
@@ -71,6 +73,9 @@ export function TaskProblemActions({ assignment, textName, onSaveBeforeReport, o
   };
 
   const causes = (assignment.active_holds ?? []).map((h, index) => {
+    if (h.own_report_id !== null && h.kind === "question") {
+      return <p key={`question-${h.own_report_id}-${index}`}>Paused by your question to the lead. The answer releases it, or resume under “Questions to the lead”.</p>;
+    }
     if (h.own_report_id !== null) {
       const own = reports?.find(r => r.report_id === h.own_report_id);
       return <p key={`own-${h.own_report_id}-${index}`}>{`Paused by your report "${reportTitle(own?.reason ?? h.reason)}".`}</p>;

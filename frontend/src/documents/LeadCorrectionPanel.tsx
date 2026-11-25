@@ -2,7 +2,7 @@
  * The lead's own correction of a rejected, queried or accepted translation (spec F1, FD1 to FD9): a
  * panel that explains the outcome, starts the lead correction (`startLeadCorrection`) and opens the
  * ordinary translation review screen (`#/tasks/{assignment_id}`). Shown from the inline Resolve options
- * under the Documents row ("Correct the translation…"; documents overview Change 13) and, for an accepted
+ * in the Resolve dialog of the Documents row ("Correct it myself (counts as accepted)…", issue 555) and, for an accepted
  * version, in a dialog from its row in the Translation part's version list (issue 341 b): before anything
  * is saved it lists the annotation work that stays on the accepted version (`getLeadCorrectionPreview`).
  */
@@ -72,6 +72,11 @@ export function reviewedAgain(row: Pick<DocumentRowView, "versions">, documentId
   return false;
 }
 
+/** Issue 555: the lead's own correction, named by what follows: counted as accepted, or reviewed again. */
+export function correctLabel(again: boolean): string {
+  return again ? "Correct it myself (reviewed again)…" : "Correct it myself (counts as accepted)…";
+}
+
 /** Refusals whose generic admin message does not fit starting a correction. */
 const START_REFUSED: Readonly<Record<string, string>> = {
   TASK_HELD: "Your earlier review of this version is paused. Resume it in the version list before you correct the translation yourself.",
@@ -131,7 +136,7 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Exclude<Failure, { kind: "languages" }> | null>(null);
   /** Missing profile languages once the server asked for the confirmation (stays until answered). */
-  const [missing, setMissing] = useState<string[] | null>(null);
+  const [asked, setAsked] = useState<string[] | null>(null);
   const [confirmLanguage, setConfirmLanguage] = useState(false);
   const documentId = chosen ?? correctionDocumentId(row);
   const entry = row.versions.find(item => item.document_id === documentId);
@@ -141,15 +146,29 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
   const [preview, setPreview] = useState<LeadCorrectionPreview | null>(null);
   const [previewError, setPreviewError] = useState<unknown>();
   const unavailable = preview && !preview.available ? NOT_AVAILABLE[preview.reason ?? ""] ?? null : null;
+  // Issue 629: the preview names the languages start would ask to confirm, so the checkbox is there before the first
+  // attempt; a refusal (LANGUAGE_CONFIRMATION_REQUIRED) still shows it when the preview did not load.
+  const missing = asked ?? (preview?.missing_languages?.length ? preview.missing_languages : null);
   const unconfirmed = missing !== null && !confirmLanguage;
-  const blocked = unconfirmed || unavailable !== null;
-
-  useEffect(() => { if (!inDialog) heading.current?.focus(); }, [inDialog]);
-  // Issue 341 b: the consequences for the work on an accepted version (or its rejected correction), before saving.
+  /** Issue 613: a profile without a qualification is known before Open, so the action says so up front. */
+  const [unqualified, setUnqualified] = useState(false);
   useEffect(() => {
-    if (!again) return;
     let live = true;
-    api.getLeadCorrectionPreview(projectKey, documentId).then(value => { if (live) setPreview(value); }, failure => { if (live) setPreviewError(failure); });
+    Promise.resolve().then(() => api.getProfile()).then(profile => { if (live && profile) setUnqualified(!profile.qualification?.trim()); }, () => undefined);
+    return () => { live = false; };
+  }, []);
+  const noQualification = unqualified || failure?.kind === "qualification";
+  const blocked = unconfirmed || unavailable !== null || noQualification;
+
+  // Rule 6 of docs/design.md › Panels and actions: in its own dialog, focus starts on the primary action.
+  const primary = useRef<HTMLButtonElement>(null);
+  useEffect(() => { (inDialog ? primary : heading).current?.focus(); }, [inDialog]);
+  // Issue 341 b: the consequences for the work on an accepted version (or its rejected correction), before saving.
+  // Issue 629: loaded for every correction, for the missing languages; its failure is shown only where the
+  // consequences depend on it (an accepted version or its correction), else start reports what is wrong.
+  useEffect(() => {
+    let live = true;
+    api.getLeadCorrectionPreview(projectKey, documentId).then(value => { if (live) setPreview(value); }, failure => { if (live && again) setPreviewError(failure); });
     return () => { live = false; };
   }, [again, projectKey, documentId]);
 
@@ -162,15 +181,16 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
       onNavigate({ name: "task", assignmentId: assignment.id });
     } catch (error: unknown) {
       const next = failureOf(error);
-      if (next.kind === "languages") { setMissing(next.missing); setConfirmLanguage(false); } else setFailure(next);
+      if (next.kind === "languages") { setAsked(next.missing); setConfirmLanguage(false); } else setFailure(next);
     } finally { writing.current = false; setBusy(false); }
   };
 
   const next = preview?.next_version ?? version + 1;
-  const consequences = preview ? correctionConsequences(preview) : [];
-  const annotated = preview ? preview.annotations.submitted + preview.annotations.open > 0 : false;
+  const consequences = preview && again ? correctionConsequences(preview) : [];
+  const annotated = preview && again ? preview.annotations.submitted + preview.annotations.open > 0 : false;
   return <div className="documents-resolve" role="group" aria-labelledby={inDialog ? undefined : `${id}-title`} aria-label={inDialog ? `Correct it myself, ${textLabel(row)} v${version}` : undefined}>
-    {!inDialog && <Heading id={`${id}-title`} ref={heading} tabIndex={-1} className="inline-confirm-title">{`Correct the translation, ${textLabel(row)}`}</Heading>}
+    {/* Rule 2: the step repeats the label of the action that opened it. */}
+    {!inDialog && <Heading id={`${id}-title`} ref={heading} tabIndex={-1} className="inline-confirm-title">{`${correctLabel(again).replace(/…$/, "")}, ${textLabel(row)}`}</Heading>}
     {accepted
       ? <p>{`You correct the accepted v${version} yourself in the translation review and submit it as Accepted with corrections. The corrected text becomes v${next}.`}</p>
       : again
@@ -180,12 +200,12 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
       {consequences.map(line => <span key={line} className="lead-correction-consequence">{line} </span>)}
     </InlineMessage>}
     {again && <p className="field-hint">{`v${next} starts as a correction with review On.`}</p>}
-    {unavailable && <InlineMessage tone="warning">{unavailable}</InlineMessage>}
+    {unavailable && <InlineMessage tone="warning"><span id={`${id}-unavailable`}>{unavailable}</span></InlineMessage>}
     {previewError !== undefined && <ErrorNotice error={previewError} />}
     {missing !== null && <Checkbox id={`${id}-language`} label={`Correct despite missing ${missing.join(", ")} in your profile`}
       checked={confirmLanguage} onChange={event => setConfirmLanguage(event.target.checked)} />}
-    {failure?.kind === "qualification" && <InlineMessage tone="warning">
-      A translation review records your qualification. Your profile has none yet.{" "}
+    {noQualification && <InlineMessage tone="warning">
+      <span id={`${id}-qualification`}>A translation review records your qualification. Your profile has none yet.</span>{" "}
       <RouteLink route={{ name: "me", documents: projectKey }} className="btn btn-secondary btn-sm" onNavigate={onNavigate}>Add your qualification in your profile</RouteLink>
     </InlineMessage>}
     {failure?.kind === "not_available" && <InlineMessage tone="warning">{failure.text}</InlineMessage>}
@@ -193,8 +213,11 @@ export function LeadCorrectionPanel({ row, projectKey, onNavigate, onCancel, hea
     {unconfirmed && <p id={`${id}-unconfirmed`} className="action-reason">Confirm the missing languages.</p>}
     <div className="documents-resolve-actions">
       <Button size="sm" onClick={onCancel}>Cancel</Button>
-      <Button size="sm" variant="primary" loading={busy} aria-disabled={blocked || busy ? true : undefined}
-        aria-describedby={unconfirmed ? `${id}-unconfirmed` : undefined} onClick={() => { void start(); }}>Open translation review</Button>
+      <Button ref={primary} size="sm" variant="primary" loading={busy} aria-disabled={blocked || busy ? true : undefined}
+        // Rule 4 of docs/design.md › Panels and actions: a greyed Open names its reason as description and tooltip.
+        aria-describedby={busy ? undefined : noQualification ? `${id}-qualification` : unconfirmed ? `${id}-unconfirmed` : unavailable !== null ? `${id}-unavailable` : undefined}
+        title={busy ? undefined : noQualification ? "Add your qualification in your profile first." : unconfirmed ? "Confirm the missing languages." : unavailable ?? undefined}
+        onClick={() => { void start(); }}>Open translation review</Button>
     </div>
   </div>;
 }

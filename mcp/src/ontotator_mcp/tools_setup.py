@@ -14,9 +14,11 @@ from ontotator_mcp.client import OntotatorClient, project_path, seg
 from ontotator_mcp.config import READ_CONTENT_VARIABLE
 from ontotator_mcp.errors import OntotatorError, hint_for
 from ontotator_mcp.models import (
+    ROLE_NOTE,
     AssignmentRow,
     CasePlanChoice,
     ExternalReview,
+    MemberRole,
     Pin,
     PlanChoice,
     TextRef,
@@ -721,11 +723,11 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         project: Project,
         username: str,
         roles: Annotated[
-            list[Literal["lead", "annotator", "adjudicator"]],
+            list[MemberRole],
             Field(
                 description=(
-                    "The complete new set of roles; 'adjudicator' is the"
-                    " consolidator. An empty list removes the person."
+                    f"The complete new set of roles; {ROLE_NOTE} An empty list"
+                    " removes the person."
                 )
             ),
         ],
@@ -751,6 +753,8 @@ def register_setup(server: MCPServer, api: OntotatorClient) -> None:
         API tokens; their open tasks of removed roles block the change
         unless revoke_assignments withdraws them.
         """
+        # 'consolidator' arrives as 'adjudicator' (MemberRole); once each.
+        roles = list(dict.fromkeys(roles))
         members = await api.get(project_path(project, "members"))
         current: list[str] = next(
             (m.get("roles", []) for m in members if m.get("username") == username),

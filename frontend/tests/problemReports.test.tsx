@@ -11,7 +11,7 @@ import type { RouteLeaveGuard } from "../src/app/router";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const assignment = { ...assigned(workspaceFixture()).assignment, workflow_revision: 4, active_round_id: "current-round", last_submission_id: "exact-result" };
-const report: ProblemReportView = { report_id: "report-1", answered: false, project_key: "pkg", assignment_id: 1, document_id: "doc", reporter_id: 1, round_id: "current-round", submission_id: "exact-result", reason: "Conflicting source evidence", state: "open", revision: 2, resolution: null, held_assignment_ids: [1], events: [], reporter_label: "Reporter", case_id: "doc", language: "en", withdrawable: false, viewer_label: "Reporter", viewer_is_lead: false };
+const report: ProblemReportView = { report_id: "report-1", answered: false, project_key: "pkg", assignment_id: 1, document_id: "doc", reporter_id: 1, round_id: "current-round", submission_id: "exact-result", reason: "Conflicting source evidence", state: "open", revision: 2, resolution: null, held_assignment_ids: [1], events: [], reporter_label: "Reporter", case_id: "doc", language: "en", withdrawable: false, viewer_label: "Reporter", viewer_is_lead: false, kind: "problem", pauses: true, took_proposed_text: false };
 
 it("requires an explicit report and preserves unsaved work when saving fails", async () => {
   const create = vi.spyOn(api, "createProblemReport").mockResolvedValue(report);
@@ -101,7 +101,7 @@ it("can resume a translation first opened while held without treating the hold a
 });
 
 it("resumes only the selected own report pause, reuses the request identity on retry and refreshes task metadata", async () => {
-  const paused = { ...assignment, held: true, hold_reason: report.reason, active_holds: [{ reason: report.reason, created_at: "2026-10-19T01:00:00Z", own_report_id: "report-1" }] };
+  const paused = { ...assignment, held: true, hold_reason: report.reason, active_holds: [{ reason: report.reason, created_at: "2026-10-19T01:00:00Z", own_report_id: "report-1", kind: "problem" as const }] };
   vi.spyOn(api, "listTaskProblemReports").mockResolvedValue([report]);
   const action = vi.spyOn(api, "actOnProblemReport").mockRejectedValueOnce(new Error("Connection lost")).mockResolvedValue({ ...report, revision: 3, held_assignment_ids: [] });
   const metadata = vi.spyOn(api, "getAssignmentMetadata").mockResolvedValue(paused);

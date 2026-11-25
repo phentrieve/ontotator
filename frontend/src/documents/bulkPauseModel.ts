@@ -18,7 +18,13 @@ type Change = TextPauseActionView["changes"][number];
 type Task = Change["tasks"][number];
 
 export const PAUSE_ACTION_LABELS: Readonly<Record<PauseAction, string>> = { pause: "Pause texts…", release: "Release texts…" };
-export const PAUSE_TITLES: Readonly<Record<PauseAction, string>> = { pause: "Pause texts", release: "Release texts" };
+/** Issue 613: the menu entry for one selected text reads in the singular, as the other entries do (#588). */
+export function pauseActionLabel(action: PauseAction, count: number): string {
+  return count === 1 ? (action === "pause" ? "Pause text…" : "Release text…") : PAUSE_ACTION_LABELS[action];
+}
+export function pauseTitle(action: PauseAction, count: number): string {
+  return pauseActionLabel(action, count).replace(/…$/, "");
+}
 
 const textsOf = (items: readonly { case_id: string; language: string }[]): string[] => [...new Set(items.map(item => textLabel(item)))];
 const tasksOf = (changes: readonly Change[]): Task[] => changes.flatMap(item => item.tasks);
@@ -65,10 +71,16 @@ export function pauseGroups(preview: TextPauseActionView): PreviewGroup[] {
   return groups;
 }
 
-/** "the work on 12 texts", or why nothing changes. */
-export function pauseSummaryText(preview: TextPauseActionView): string {
+/** "the work on 12 texts", or why nothing changes; `count` selected texts, one gets the singular (issue 585). */
+export function pauseSummaryText(preview: TextPauseActionView, count: number): string {
   if (preview.changes.length) return `${preview.action === "pause" ? "the work on" : "the pause of"} ${plural(preview.changes.length, "text")}`;
-  return preview.action === "pause" ? "The selected texts are already paused." : "None of the selected texts is paused by a lead.";
+  return nothingText(preview.action, count);
+}
+
+/** Why pausing or releasing changes nothing for the selection: the dialog's summary and the menu's reason. */
+function nothingText(action: PauseAction, count: number): string {
+  if (count === 1) return action === "pause" ? "The selected text is already paused." : "The selected text is not paused by a lead.";
+  return action === "pause" ? "The selected texts are already paused." : "None of the selected texts is paused by a lead.";
 }
 
 /** The dialog's action button: "Pause 12 texts", "Release 3 texts". */
@@ -89,7 +101,7 @@ export function pauseConsequences(preview: TextPauseActionView): string[] {
       : "Nobody has an open task on these texts now.",
     `Tasks assigned, reopened or given a new round on ${preview.changes.length === 1 ? "this text" : "these texts"} later are paused from the start, until you release the ${preview.changes.length === 1 ? "text" : "texts"}.`,
     "Submitted work and final results are untouched and are exported as before.",
-    "A pause from a problem report is separate: it stays, and deciding a report does not release this pause. Release texts… ends it.",
+    `A pause from a problem report is separate: it stays, and deciding a report does not release this pause. ${pauseActionLabel("release", preview.changes.length)} ends it.`,
   ];
   const still = tasks.filter(task => task.paused_by_report).length;
   return [
@@ -97,7 +109,7 @@ export function pauseConsequences(preview: TextPauseActionView): string[] {
       : tasks.length > still ? `${plural(tasks.length - still, "task")} of ${who} can be worked on again, as they were left.`
       : `The lead pause of ${texts} ends.`,
     ...(still ? [`${plural(still, "task")} ${still === 1 ? "stays" : "stay"} paused by a problem report until that report is decided.`] : []),
-    "Pause texts… pauses them again.",
+    preview.changes.length === 1 ? "Pause text… pauses it again." : "Pause texts… pauses them again.",
   ];
 }
 
@@ -106,8 +118,11 @@ export function pauseAppliedText(result: TextPauseActionView): string {
   return `${result.action === "pause" ? "Paused" : "Released"} ${plural(result.changes.length, "text")}.`;
 }
 
-/** A menu entry that does nothing for the selection gives its reason (decision 336-C); null when it acts or is unknown. */
-export function pauseUnavailableReason(action: PauseAction, preview: TextPauseActionView | null | undefined): string | null {
+/**
+ * A menu entry that does nothing for the selection gives its reason (decision 336-C); null when it acts or is unknown.
+ * `count` is the number of selected texts: one text gets the singular (issue 585).
+ */
+export function pauseUnavailableReason(action: PauseAction, preview: TextPauseActionView | null | undefined, count: number): string | null {
   if (!preview || preview.change_count) return null;
-  return action === "pause" ? "The selected texts are already paused." : "None of the selected texts is paused by a lead.";
+  return nothingText(action, count);
 }

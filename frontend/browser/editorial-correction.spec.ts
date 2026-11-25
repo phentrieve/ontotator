@@ -57,8 +57,10 @@ async function loginLead(page: Page, s: LeadScenario) {
   await documentsReady(page);
 }
 
-const correctionDialog = (page: Page, caseId: string) => page.getByRole("dialog", { name: `Fix typos, ${caseId} de v1`, exact: true });
-const fixAction = (item: Locator, caseId: string, v = 1) => item.getByRole("button", { name: `Fix typos in v${v} of ${caseId} de…`, exact: true });
+const correctionDialog = (page: Page, caseId: string) => page.getByRole("dialog", { name: `Fix typos (no review), ${caseId} de v1`, exact: true });
+/** Where only the typo fix is possible (a version that is not accepted), the button names it and its consequence. */
+const fixAction = (item: Locator, caseId: string, v = 1) => item.getByRole("button", { name: `Fix typos (no review) in v${v} of ${caseId} de…`, exact: true });
+const editAction = (item: Locator, caseId: string, v = 1) => item.getByRole("button", { name: `Edit the translation v${v} of ${caseId} de…`, exact: true });
 
 test("a comma added to an accepted translation becomes an accepted v2 on one page; a changed number is pointed out", async ({ page }) => {
   const errors = consoleErrors(page);
@@ -67,34 +69,43 @@ test("a comma added to an accepted translation becomes an accepted v2 on one pag
   await loginLead(page, s);
   const card = await openTextCard(page, caseId, "de");
   const [v1] = await (await textVersionItems(card, 1)).all();
-  // Next to the other version actions of the newest version, with a hint that tells it apart.
-  await expect(v1.getByRole("button", { name: `Correct v1 of ${caseId} de myself…`, exact: true })).toBeVisible();
-  await expect(v1.getByRole("button", { name: `Upload a corrected text for v1 of ${caseId} de…`, exact: true })).toBeVisible();
-  const open = fixAction(v1, caseId);
-  await expect(open).toHaveText("Fix typos…");
-  await expect(open).toHaveAttribute("title", "Spacing, typos, grammar. Keeps the status; no review.");
+  // Issue 555: an accepted version has one edit action; the choice of what changes comes first, with its consequence.
+  await expect(fixAction(v1, caseId)).toHaveCount(0);
+  await expect(v1.getByRole("button", { name: `Other ways to change v1 of ${caseId} de`, exact: true })).toBeVisible();
+  await expect(v1.locator(".text-version-hint")).toHaveCount(0);
   await evidence(page, "453-row-before");
-  await open.click();
+  await editAction(v1, caseId).click();
+  const choice = page.getByRole("dialog", { name: `Edit the translation, ${caseId} de v1`, exact: true });
+  await expect(choice.getByRole("radio", { name: "Only spelling, spacing or grammar", exact: true })).toHaveAccessibleDescription("The meaning stays. No review; submitted annotations move to v2.");
+  await expect(choice.getByRole("radio", { name: "The meaning changes", exact: true })).toHaveAccessibleDescription("v2 is reviewed again. Annotations stay on v1; you handle the text change after.");
+  await evidence(page, "555-edit-choice");
+  await choice.getByRole("radio", { name: "Only spelling, spacing or grammar", exact: true }).check();
+  await choice.getByRole("button", { name: "Continue", exact: true }).click();
 
   const dialog = correctionDialog(page, caseId);
   // The translation editor starts with the text of v1; there is no second step.
   const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
   await expect(editor).toHaveValue(oldText(caseId));
   await expect(dialog.getByRole("button", { name: "Check changes", exact: true })).toHaveCount(0);
-  // The started annotation stays on v1: the highlighted block says what to do next. Whether the submitted one moves
-  // by itself is known once the text changes (issue 543, U4-04).
-  await expect(dialog.getByText("Work stays on v1", { exact: true })).toBeVisible();
-  await expect(dialog).toContainText("1 annotation stays on v1. After saving, use Handle text change… on this row to move it.");
-  await expect(dialog).toContainText("Once you change the text, this says whether the submitted annotation moves to v2 by itself.");
-  await expect(dialog.getByText("v2 keeps the status of v1: Accepted. No translation review is started.", { exact: true })).toBeVisible();
+  // Issue 556: one line on top says what the fix keeps. The started annotation stays on v1, and "After saving" says
+  // with which step it moves. Whether the submitted one moves by itself is known once the text changes (issue 543, U4-04).
+  await expect(dialog.getByText("Only spelling, spacing or grammar. v2 stays Accepted; no translation review is started.", { exact: true })).toBeVisible();
+  const afterSaving = dialog.getByRole("region", { name: "After saving", exact: true });
+  await expect(afterSaving).toContainText(/stays on v1 \([^)]*\)\. Move it later with Handle text change…/);
+  await expect(afterSaving).toContainText("Once you change the text, this says whether the submitted annotation moves to v2 by itself.");
+  await expect(dialog.getByLabel("Note", { exact: true })).toHaveAttribute("placeholder", "Optional, e.g. the word you corrected");
   await evidence(page, "453-dialog-open");
 
-  // Nothing changed and no reason: the button says so and a click names what is missing.
-  const save = dialog.getByRole("button", { name: "Save as v2", exact: true });
+  // Nothing changed and no reason: the greyed button says why (also on focus, not on hover only), and a click names what is missing.
+  const save = dialog.getByRole("button", { name: "Save as v2 (stays Accepted)", exact: true });
   await expect(save).toHaveAttribute("aria-disabled", "true");
+  await expect(save).toHaveAccessibleDescription("Change the text first.");
+  await save.focus();
+  await expect(dialog.locator(".ui-reason-tip")).toBeVisible();
   await save.click({ force: true });
-  await expect(dialog.getByText("Change the text first.", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("alert").filter({ hasText: "Change the text first." })).toBeVisible();
   await expect(dialog.getByText("Choose what you fixed or write a note.", { exact: true })).toBeVisible();
+  await evidence(page, "556-save-reason");
 
   // A changed number is pointed out in place; it blocks nothing.
   await editor.fill(oldText(caseId).replace("14-month", "15-month"));
@@ -128,8 +139,8 @@ test("a comma added to an accepted translation becomes an accepted v2 on one pag
   await expect(newest.getByRole("button", { name: `Accept v2 of ${caseId} de…`, exact: true })).toHaveCount(0);
   const older = items.filter({ hasNotText: "Correction of v1" });
   await expect(older).toContainText("Accepted");
-  await expect(older.getByRole("button", { name: /^Fix typos/ })).toHaveCount(0);
-  await expect(fixAction(newest, caseId, 2)).toBeVisible();
+  await expect(older.getByRole("button", { name: /^(Fix typos|Edit the translation)/ })).toHaveCount(0);
+  await expect(editAction(newest, caseId, 2)).toBeVisible();
   await evidence(page, "453-row-after");
   await textCard(page, caseId, "de").getByRole("button", { name: "Close", exact: true }).click();
   expect(errors).toEqual([]);
@@ -151,10 +162,9 @@ test("at 390 px: an unreviewed translation is corrected and stays ready for revi
   const dialog = correctionDialog(page, caseId);
   const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
   await expect(editor).toHaveValue(oldText(caseId));
-  // Nothing on v1: one quiet sentence, no highlighted block.
-  await expect(dialog.getByText("Nobody has annotated v1 yet.", { exact: true })).toBeVisible();
-  await expect(dialog.getByText("Work stays on v1", { exact: true })).toHaveCount(0);
-  await expect(dialog.getByText("v2 keeps the status of v1: Ready for review. No translation review is started.", { exact: true })).toBeVisible();
+  // Nothing on v1: one quiet line under "After saving".
+  await expect(dialog.getByRole("region", { name: "After saving", exact: true }).getByRole("listitem")).toHaveText(["Nobody has annotated v1 yet."]);
+  await expect(dialog.getByText("Only spelling, spacing or grammar. v2 stays Ready for review; no translation review is started.", { exact: true })).toBeVisible();
   await noHorizontalScroll(page, "dialog");
   await editor.fill(fixedText(caseId));
   await expect(dialog).toContainText("Changes to v1 · 1 character changed");
@@ -163,7 +173,7 @@ test("at 390 px: an unreviewed translation is corrected and stays ready for revi
   await noHorizontalScroll(page, "changes");
   await evidence(page, "453-phone-dialog");
   await page.setViewportSize(PHONE);
-  await dialog.getByRole("button", { name: "Save as v2", exact: true }).click();
+  await dialog.getByRole("button", { name: "Save as v2 (stays Ready for review)", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText(`Typos fixed: v2 of ${caseId} de saved. It stays Ready for review.`);
   await noHorizontalScroll(page, "saved");
@@ -190,11 +200,11 @@ test("a rejected translation is corrected and stays rejected", async ({ page }) 
   await evidence(page, "453-rejected-row-before");
   await fixAction(v1, caseId).click();
   const dialog = correctionDialog(page, caseId);
-  await expect(dialog.getByText("v2 keeps the status of v1: Rejected in review. No translation review is started.", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Only spelling, spacing or grammar. v2 stays Rejected in review; no translation review is started.", { exact: true })).toBeVisible();
   const editor = dialog.getByRole("textbox", { name: "Corrected text", exact: true });
   await editor.fill(`${await editor.inputValue()}.`);
   await dialog.getByLabel("Note", { exact: true }).fill("Full stop at the end");
-  await dialog.getByRole("button", { name: "Save as v2", exact: true }).click();
+  await dialog.getByRole("button", { name: "Save as v2 (stays Rejected in review)", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.locator(".ui-toast .ui-toast-message")).toHaveText(`Typos fixed: v2 of ${caseId} de saved. It stays Rejected in review.`);
   const items = await textVersionItems(await openTextCard(page, caseId, "de"), 2);
@@ -216,7 +226,7 @@ test("an open translation review refuses the correction", async ({ page }) => {
   await fixAction(v1, caseId).click();
   const dialog = correctionDialog(page, caseId);
   await expect(dialog.getByText("A translation review of this version is open. Withdraw it with Remove… in the reviewer’s row of the Translation part, or make the fix in that review.", { exact: true })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Save as v2", exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: /^Save as v2/ })).toHaveCount(0);
   await expect(dialog.getByRole("textbox")).toHaveCount(0);
   await evidence(page, "453-dialog-review-open");
   await dialog.locator(".modal-actions").getByRole("button", { name: "Close", exact: true }).click();

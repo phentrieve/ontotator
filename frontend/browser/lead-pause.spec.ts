@@ -67,8 +67,10 @@ async function openMenu(page: Page): Promise<Locator> {
 /** Run "Pause texts…" or "Release texts…" on the current selection to the end; returns after the toast. */
 async function run(page: Page, action: "Pause" | "Release", texts: number, changed: number, reason?: string): Promise<void> {
   const menu = await openMenu(page);
-  await menu.getByRole("menuitem", { name: `${action} texts…` }).click();
-  const dialog = page.getByRole("dialog", { name: `${action} texts: ${texts} ${texts === 1 ? "text" : "texts"}` });
+  // One selected text: the entry and the title read in the singular (issue 613).
+  const noun = texts === 1 ? "text" : "texts";
+  await menu.getByRole("menuitem", { name: `${action} ${noun}…` }).click();
+  const dialog = page.getByRole("dialog", { name: `${action} ${noun}: ${texts} ${noun}` });
   const apply = dialog.getByRole("button", { name: `${action} ${changed} ${changed === 1 ? "text" : "texts"}` });
   await expect(apply).toBeVisible();
   if (reason) await dialog.getByLabel(/^Reason/).fill(reason);
@@ -336,8 +338,8 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
 
     // The release names the task the report still pauses.
     const menu = await openMenu(page);
-    await menu.getByRole("menuitem", { name: "Release texts…" }).click();
-    const release = page.getByRole("dialog", { name: "Release texts: 1 text" });
+    await menu.getByRole("menuitem", { name: "Release text…" }).click();
+    const release = page.getByRole("dialog", { name: "Release text: 1 text" });
     const groups = release.getByRole("list", { name: "Preview" }).getByRole("listitem");
     await expect(groups.nth(1)).toContainText("1 task stays paused · paused by a problem report as well: decide the report under Problem reports");
     expect(await noHorizontalScroll(page)).toBe(true);
@@ -478,6 +480,10 @@ for (const [width, height, suffix] of [[1440, 900, ""], [390, 844, "-phone"]] as
     const alone = await openMenu(page);
     await expect(alone.getByRole("menuitem", { name: /^Start a round…/ })).toContainText("The selected text has an open consolidation.");
     await expect(alone.getByRole("menuitem", { name: /^Withdraw open tasks…/ })).toContainText("The open tasks are paused by a lead: release the text first.");
+    // Issue 585: every reason speaks of one text.
+    await expect(alone.getByRole("menuitem", { name: /^Change final…/ })).toContainText("The selected text has no final result yet.");
+    await expect(alone.getByRole("menuitem", { name: /^Pause text…/ })).toContainText("The selected text is already paused.");
+    await expect(alone).not.toContainText("selected texts");
     expect(await noHorizontalScroll(page)).toBe(true);
     await shot(page, `576-menu-reasons${suffix}`);
     expect(errors).toEqual([]);
