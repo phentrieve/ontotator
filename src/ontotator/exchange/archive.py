@@ -125,7 +125,14 @@ from ontotator.storage.tables import (
 )
 
 FORMAT = "ontotator-project-archive"
-SCHEMA_VERSION = 1
+# The newest archive schema version this server reads.
+SCHEMA_VERSION = 2
+# Version 2 (issue 560): the form of a translation review draft may hold the
+# reviewer's segment pairs ("segment_pairs"). A server that reads only version 1
+# would import them into a form it then refuses at submit, so only an archive with
+# segment pairs is written as version 2: older servers refuse it cleanly, and every
+# other archive stays version 1 and imports there as before.
+SEGMENT_PAIRS_FORM_KEY = "segment_pairs"
 MANIFEST = "manifest.json"
 PEOPLE = "people.jsonl"
 ONTOLOGY_FILES = "ontology_files.jsonl"
@@ -163,13 +170,31 @@ _ONTOLOGY_FILE_COLUMNS = (
     "language",
     "uploaded_at",
 )
+
+
+def _upgrade_from_1(
+    manifest: dict[str, Any], contents: dict[str, Path]
+) -> tuple[dict[str, Any], dict[str, Path]]:
+    """Version 1 is version 2 without segment pairs: nothing to change."""
+    return {**manifest, "schema_version": 2}, contents
+
+
 # Upgrade functions of older archive schema versions: version -> function
 # returning the manifest and the (non-blob) files of the next version, by
-# name, as files on disk. None yet.
+# name, as files on disk.
 UPGRADES: dict[
     int,
     Callable[[dict[str, Any], dict[str, Path]], tuple[dict[str, Any], dict[str, Path]]],
-] = {}
+] = {1: _upgrade_from_1}
+
+
+def written_schema_version(found: Mapping[str, list[dict[str, Any]]]) -> int:
+    """The schema version of an archive of these rows: 2 only with segment pairs."""
+    for row in found.get("translation_review_drafts", ()):
+        form = row.get("form")
+        if isinstance(form, dict) and SEGMENT_PAIRS_FORM_KEY in form:
+            return 2
+    return 1
 
 
 def table_file(name: str) -> str:
@@ -596,6 +621,7 @@ def build_archive(
         revision = current_revision(conn)
         found = {entry.name: _rows(conn, entry, project.id) for entry in ARCHIVED}
         _with_jobs_referred_to(conn, found, project.id, project_key)
+        schema_version = written_schema_version(found)
         for job in found["jobs"]:
             # Export results are never archived, so no job names its file:
             # the copy has nothing to download (an import refuses one that does).
@@ -674,7 +700,7 @@ def build_archive(
         manifest_files[blob_file(digest)] = {"sha256": digest, "size": size}
     manifest = {
         "format": FORMAT,
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": schema_version,
         "ontotator_version": __version__,
         "alembic_revision": revision,
         "instance_id": source,

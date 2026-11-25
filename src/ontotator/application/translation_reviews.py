@@ -6,7 +6,14 @@ from datetime import UTC, date, datetime
 from typing import Any, Literal
 
 from ontospan import TranslationCheck, canonical_text
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictInt,
+    ValidationError,
+    model_validator,
+)
 from sqlalchemy import Connection, RowMapping, func, insert, select, update
 
 from ontotator.assignments.service import (
@@ -127,9 +134,152 @@ def merged_checked_sentences(
     return CheckedSentences(**sides)
 
 
+# The reviewer's segment pairs (issue 560, prototype) live in the draft's form JSON
+# under this key, beside the checked-sentence marks and with the same rules: a working
+# aid only, never part of the review form, the submitted record, exports or audit.
+SEGMENT_PAIRS_KEY = "segment_pairs"
+MAX_SEGMENT_PAIRS = 5000
+# The keys of the draft form that are the reviewer's aids, not the review.
+AID_KEYS = (CHECKED_SENTENCES_KEY, SEGMENT_PAIRS_KEY)
+
+
+# Where a segment pair comes from (see SegmentPair).
+SegmentPairOrigin = Literal["aligner", "manual", "pipeline"]
+
+
+class SegmentSpan(BaseModel):
+    """A passage of one text, in UTF-16 code units as the browser counts them."""
+
+    model_config = ConfigDict(extra="forbid")
+    start: StrictInt = Field(ge=0, le=10_000_000)
+    end: StrictInt = Field(ge=0, le=10_000_000)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> "SegmentSpan":
+        if self.end < self.start:
+            raise ValueError("end before start")
+        return self
+
+
+class SegmentPair(BaseModel):
+    """One aligned pair: a passage of the source and the passage of the translation.
+
+    ``checked`` is the hash of the pair's translation when the reviewer checked it,
+    or ``stale`` for a pair joined from a partly checked one; the client compares it
+    with the hash of the passage now. ``origin`` says where the pair comes from:
+    ``aligner`` (the rule-based aligner of the browser), ``manual`` (made or changed
+    by the reviewer: a merge, a split, later pairing by hand) or ``pipeline`` (the
+    translation pipeline's alignment, not supplied yet). All three are accepted and
+    stored as they are, so pairs of the later sources need no data migration; any
+    other value is refused.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    source: SegmentSpan
+    translation: SegmentSpan
+    origin: SegmentPairOrigin = "aligner"
+    checked: str | None = Field(default=None, pattern=r"^(?:[0-9a-f]{8}|stale)$")
+
+
+class SegmentPairs(BaseModel):
+    """The reviewer's alignment of the source and the draft text, with its checks.
+
+    ``source_hash`` and ``text_hash`` name the texts the passages refer to; a client
+    that finds other texts aligns them anew.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    source_hash: str = Field(pattern=r"^[0-9a-f]{8}$")
+    text_hash: str = Field(pattern=r"^[0-9a-f]{8}$")
+    pairs: list[SegmentPair] = Field(default_factory=list, max_length=MAX_SEGMENT_PAIRS)
+
+    @model_validator(mode="after")
+    def _in_order(self) -> "SegmentPairs":
+        source = translation = 0
+        for pair in self.pairs:
+            if pair.source.start < source or pair.translation.start < translation:
+                raise ValueError("pairs overlap or are out of order")
+            source, translation = pair.source.end, pair.translation.end
+        return self
+
+
+class SegmentPairsSave(SegmentPairs):
+    """New pairs, optionally with the pairs they were made from.
+
+    With ``base``, a save does not undo what another tab saved meanwhile: when both
+    tabs refer to the same texts, the checks this tab changed since ``base`` are
+    applied, and the checks the other tab changed are kept (see
+    ``merged_segment_pairs``). Without ``base``, the new pairs replace the stored ones.
+    """
+
+    base: SegmentPairs | None = None
+
+
+_PairKey = tuple[int, int, int, int]
+
+
+def _pair_key(pair: SegmentPair) -> _PairKey:
+    return (
+        pair.source.start,
+        pair.source.end,
+        pair.translation.start,
+        pair.translation.end,
+    )
+
+
+def merged_segment_pairs(
+    stored: SegmentPairs | None, base: SegmentPairs | None, mine: SegmentPairs
+) -> SegmentPairs:
+    """The pairs to store when ``mine`` was made from ``base`` and ``stored`` is now.
+
+    Nothing saved meanwhile, or pairs of other texts: ``mine``. Else the pairs are
+    those of the tab that changed them (``mine`` when both did), and each pair's
+    check is the one a tab changed since ``base`` (``mine`` first), else as stored.
+    """
+    if (
+        stored is None
+        or base is None
+        or stored == base
+        or (stored.source_hash, stored.text_hash) != (mine.source_hash, mine.text_hash)
+        or (base.source_hash, base.text_hash) != (mine.source_hash, mine.text_hash)
+    ):
+        return mine
+    before = {_pair_key(pair): pair.checked for pair in base.pairs}
+    ours = {_pair_key(pair): pair.checked for pair in mine.pairs}
+    theirs = {_pair_key(pair): pair.checked for pair in stored.pairs}
+    shape = stored if set(ours) == set(before) else mine
+
+    def check(key: _PairKey, own: str | None) -> str | None:
+        if key in ours and (key not in before or ours[key] != before[key]):
+            return ours[key]
+        if key in theirs and (key not in before or theirs[key] != before[key]):
+            return theirs[key]
+        return own
+
+    return SegmentPairs(
+        source_hash=mine.source_hash,
+        text_hash=mine.text_hash,
+        pairs=[
+            pair.model_copy(update={"checked": check(_pair_key(pair), pair.checked)})
+            for pair in shape.pairs
+        ],
+    )
+
+
+def stored_segment_pairs(form: dict[str, Any] | None) -> SegmentPairs | None:
+    """The stored pairs; pairs that do not fit today's rules read as none."""
+    raw = (form or {}).get(SEGMENT_PAIRS_KEY)
+    if raw is None:
+        return None
+    try:
+        return SegmentPairs.model_validate(raw)
+    except ValidationError:
+        return None
+
+
 def review_form(form: dict[str, Any]) -> dict[str, Any]:
-    """The draft form without the checked-sentence marks."""
-    return {k: v for k, v in form.items() if k != CHECKED_SENTENCES_KEY}
+    """The draft form without the reviewer's aids (checked sentences, segment pairs)."""
+    return {k: v for k, v in form.items() if k not in AID_KEYS}
 
 
 def stored_checked_sentences(form: dict[str, Any] | None) -> CheckedSentences:
@@ -305,6 +455,9 @@ class ReviewWorkspace:
     reviewed_again: bool = False
     # The reviewer's own checked-sentence marks (issue 256); empty once submitted.
     checked_sentences: CheckedSentences = field(default_factory=CheckedSentences)
+    # The reviewer's segment pairs (issue 560); None before the first save and once
+    # submitted.
+    segment_pairs: SegmentPairs | None = None
     # A version after the first: how it was made and the version before it,
     # so the reviewer sees what changed. None for the first version.
     version_origin: VersionOrigin | None = None
@@ -630,9 +783,11 @@ class TranslationReviewService:
                     row or 0,
                 )
                 marks = CheckedSentences()
+                pairs = None
             else:
                 draft = self._draft(conn, assignment, pid, variant)
                 marks = stored_checked_sentences(draft.form)
+                pairs = stored_segment_pairs(draft.form)
                 draft = replace(draft, form=review_form(draft.form))
             comparisons = translation_review_comparisons(
                 variant, ancestor, variants.values()
@@ -686,6 +841,7 @@ class TranslationReviewService:
                 assignment.lead_correction
                 and descends_from_accepted(variant, variants.get),
                 marks,
+                segment_pairs=pairs,
                 version_origin=self._version_origin(conn, pid, variant, previous),
                 previous_version=None
                 if previous is None
@@ -821,11 +977,11 @@ class TranslationReviewService:
                 raise RevisionConflict()
             revision = draft.revision + 1
             now = self._now()
-            # The marks are saved on their own; a draft save keeps the stored ones.
-            stored = draft.form.get(CHECKED_SENTENCES_KEY)
+            # The reviewer's aids are saved on their own; a draft save keeps them.
             form = review_form(form)
-            if stored is not None:
-                form[CHECKED_SENTENCES_KEY] = stored
+            for key in AID_KEYS:
+                if (stored := draft.form.get(key)) is not None:
+                    form[key] = stored
             conn.execute(
                 update(TranslationReviewDraftRow)
                 .where(TranslationReviewDraftRow.assignment_id == assignment.id)
@@ -889,6 +1045,36 @@ class TranslationReviewService:
                 )
             )
             return marks
+
+    def save_segment_pairs(
+        self, access: Access, assignment_id: int, pairs: SegmentPairs
+    ) -> SegmentPairs:
+        """Store the reviewer's segment pairs (issue 560) and return what is stored.
+
+        A working aid like the checked-sentence marks: the draft revision, its time
+        stamp and the assignment status stay as they are, and nothing is audited.
+        With ``base``, checks another tab saved meanwhile stay (see
+        ``merged_segment_pairs``).
+        """
+        with self.db.transaction() as conn:
+            assignment, pid, _ = self._authority(conn, access, assignment_id)
+            self._editable(assignment)
+            variant, _, _, _ = self._context(assignment)
+            draft = self._draft(conn, assignment, pid, variant)
+            base = pairs.base if isinstance(pairs, SegmentPairsSave) else None
+            mine = SegmentPairs.model_validate(pairs.model_dump(exclude={"base"}))
+            result = merged_segment_pairs(stored_segment_pairs(draft.form), base, mine)
+            conn.execute(
+                update(TranslationReviewDraftRow)
+                .where(TranslationReviewDraftRow.assignment_id == assignment.id)
+                .values(
+                    form={
+                        **draft.form,
+                        SEGMENT_PAIRS_KEY: result.model_dump(mode="json"),
+                    }
+                )
+            )
+            return result
 
     def submit(
         self, access: Access, assignment_id: int, *, expected_revision: int

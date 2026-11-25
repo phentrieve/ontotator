@@ -13,6 +13,8 @@ from ontotator.application.translation_reviews import (
     CheckedSentences,
     CheckedSentencesSave,
     ReviewWorkspace,
+    SegmentPairs,
+    SegmentPairsSave,
     TranslationReviewRecord,
     TranslationReviewService,
 )
@@ -105,6 +107,23 @@ def save_checked_sentences(
     """
     return _service(request).save_checked_sentences(
         get_access(request), assignment_id, body, base=body.base
+    )
+
+
+@router.put("/translation-reviews/{assignment_id}/segment-pairs")
+def save_segment_pairs(
+    assignment_id: int,
+    body: SegmentPairsSave,
+    request: Request,
+    principal: PrincipalDep,
+) -> SegmentPairs:
+    """The reviewer's own segment pairs and their checks; not part of the review.
+
+    With ``base`` (the pairs this tab last had), checks saved meanwhile in another
+    tab stay. The answer is what is stored.
+    """
+    return _service(request).save_segment_pairs(
+        get_access(request), assignment_id, body
     )
 
 
