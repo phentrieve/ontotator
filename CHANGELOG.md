@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.15.2] - 2026-11-25
+
 ### Fixed
 
 - Re-anchoring after a text correction loses no tool proposals (#650). A typo fix that changed the words of every proposal of a text annotated from proposals left the new version with a carried set of 0 proposals and only proposals waiting for a check: **Handle text change** said *v2 has no proposals yet* and **Retry** never helped, a new assignment was refused or offered *From scratch (no tool proposals)*, and nobody saw the waiting proposals. Such a version now counts as having proposals: the open task moves there, a new task is from proposals, batch assignment and mode changes take it, and the task lists the proposals under **Needs review after the text change**. Proposal counts still say 0 proposals. A proposal still waiting for a check is also carried on by a further correction (v2 → v3) with its context in the new text, so **Use this location** and *now “…”* work on v3; the words it was proposed on stay as they were. A task that decided it keeps its decision; a new task on v3 checks it for itself. A carried set stored by an earlier release stays as it is, and the next correction of that text carries the waiting proposals on from it without a conflict. No API change, no migration.
@@ -627,7 +629,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 First public release.
 
-[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.15.1...HEAD
+[Unreleased]: https://github.com/phentrieve/ontotator/compare/v0.15.2...HEAD
+[0.15.2]: https://github.com/phentrieve/ontotator/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/phentrieve/ontotator/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/phentrieve/ontotator/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/phentrieve/ontotator/compare/v0.14.0...v0.14.1
