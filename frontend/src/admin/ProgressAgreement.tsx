@@ -6,7 +6,7 @@ const figure = (value: number | null | undefined) => value == null ? "–" : val
 
 interface BreakdownRow { key: string; label: string; count: number; credit: string; tone: "same" | "related" | "conflict" }
 
-/** The paired findings of the pooled counts, by how they count (#600, #636). */
+/** The paired findings of the pooled counts, by how they count (issues 600, 636). */
 export function agreementBreakdown(pooled: AgreementPooled): BreakdownRow[] {
   const related = pooled.related_term_conflicts;
   return [
@@ -19,7 +19,7 @@ export function agreementBreakdown(pooled: AgreementPooled): BreakdownRow[] {
   ];
 }
 
-/** Progress › Agreement (#600, decided in #636): the figures of agreement.csv for the current final results.
+/** Progress › Agreement (issue 600, decided in issue 636): the figures of agreement.csv for the current final results.
  * Leads only, like the route; for anyone else, or when it fails, the rest of Progress stays as it is. */
 export function ProgressAgreement({ projectKey, revision }: { projectKey: string; revision: number }): JSX.Element | null {
   const [value, setValue] = useState<ProjectAgreement | null>(null);
