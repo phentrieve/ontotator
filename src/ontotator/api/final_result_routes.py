@@ -325,6 +325,8 @@ class AgreementValues(BaseModel):
 
     annotation_strict_f1: float | None
     annotation_tolerant_f1: float | None
+    # Tolerant, a parent/child pair with the same values counting 1/2 (#600).
+    annotation_hierarchical_f1: float | None
     mention_strict_f1: float | None
     mention_tolerant_f1: float | None
     term_f1: float | None
@@ -351,6 +353,8 @@ class AgreementCounts(BaseModel):
     modifiers_agreeing: int
     # Of term_conflicts: the terms are ancestor and descendant (#303).
     related_term_conflicts: int
+    # Of related_term_conflicts: those with the same values (#600).
+    hierarchy_credited: int
 
 
 class AgreementMacroMean(AgreementValues):
