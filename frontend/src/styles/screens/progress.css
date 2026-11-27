@@ -59,3 +59,30 @@
   .progress-skeleton-bar { background: GrayText; }
 }
 .progress-work-time { margin-bottom: var(--space-6); }
+
+/* Agreement (#600, #636). */
+.progress-agreement { margin-bottom: var(--space-6); }
+.progress-heading-row { display: flex; align-items: center; gap: var(--space-2); }
+.progress-heading-row h2 { margin: 0; }
+.progress-agreement h3 { margin: var(--space-5) 0 var(--space-2); font-size: var(--size-base); }
+.progress-figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.progress-figures li { display: grid; gap: var(--space-1); padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-raised); min-width: 0; }
+.progress-figure-label, .progress-figure-sub { font-size: var(--size-sm); color: var(--text-muted); }
+.progress-figure-n { font-size: var(--size-2xl); line-height: var(--leading-2xl); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
+.progress-figures .progress-figure--hierarchy { border-color: var(--accent); }
+.progress-breakdown { max-width: 52rem; }
+.progress-breakdown tbody th { font-weight: var(--weight-regular); }
+.progress-breakdown .num { text-align: right; font-variant-numeric: tabular-nums; }
+.progress-bar-col { width: 34%; }
+.progress-bar { display: block; height: 10px; margin-top: 6px; border-radius: 3px; background: var(--surface-sunken); overflow: hidden; }
+.progress-bar span { display: block; height: 100%; background: var(--border-strong); }
+.progress-breakdown--same .progress-bar span { background: var(--success); }
+.progress-breakdown--related .progress-bar span { background: repeating-linear-gradient(135deg, var(--accent) 0 4px, var(--accent-light) 4px 7px); }
+.progress-breakdown--related th { font-weight: var(--weight-strong); }
+@media (max-width: 700px) {
+  .progress-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .progress-bar-col { display: none; }
+}
+@media (forced-colors: active) {
+  .progress-bar span { forced-color-adjust: none; background: Highlight; }
+}

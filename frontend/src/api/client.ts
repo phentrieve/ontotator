@@ -39,6 +39,8 @@ export type ExportKind = components["schemas"]["ExportRequest"]["kind"];
 export type WorkTimeView = components["schemas"]["WorkTimeView"];
 export type WorkTimeItem = components["schemas"]["WorkTimeItemRequest"];
 export type ProjectWorkTime = components["schemas"]["ProjectWorkTimeView"];
+export type ProjectAgreement = components["schemas"]["ProjectAgreement"];
+export type AgreementPooled = components["schemas"]["AgreementPooled"];
 export type WorkTimeModeTotal = components["schemas"]["ModeTotalView"];
 export type ExportCreated = components["schemas"]["ExportCreated"];
 export interface ProjectDocumentFilters { language?: string; status?: string; q?: string; origin?: string; translation_status?: string }
@@ -1102,6 +1104,11 @@ export class ApiClient {
   async reportWorkTime(assignmentId: number, items: WorkTimeItem[], options: { keepalive?: boolean } = {}): Promise<WorkTimeView> {
     return this.request<WorkTimeView>(`/api/v1/assignments/${assignmentId}/work-time`, {
       method: "POST", body: JSON.stringify({ items }), ...(options.keepalive ? { keepalive: true } : {}) });
+  }
+
+  /** Agreement of the annotations behind the current final results (leads only; #353, #600). */
+  async getProjectAgreement(key: string): Promise<ProjectAgreement> {
+    return this.request<ProjectAgreement>(`/api/v1/projects/${encodeURIComponent(key)}/agreement`, { method: "GET" });
   }
 
   /** Sums per mode for leads: texts, total and median per text. */
