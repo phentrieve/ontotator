@@ -11,11 +11,11 @@ That is the default. With `ONTOTATOR_MCP_READ_CONTENT=1` five more tools read a 
 You need [uv](https://docs.astral.sh/uv/). Install the command from the repository:
 
 ```bash
-uv tool install "git+https://github.com/phentrieve/ontotator@v0.14.0#subdirectory=mcp"
+uv tool install "git+https://github.com/phentrieve/ontotator@v0.15.0#subdirectory=mcp"
 which ontotator-mcp
 ```
 
-The URL names a release tag, so the server changes only when you install another release: to update, run the command again with the newer tag in the URL. Without a tag the URL would follow `main`, and every push would update the server. From a checkout of a release tag, `uv tool install ./mcp` does the same. Without installing, `uvx --from "git+https://github.com/phentrieve/ontotator@v0.14.0#subdirectory=mcp" ontotator-mcp` runs it directly.
+The URL names a release tag, so the server changes only when you install another release: to update, run the command again with the newer tag in the URL. Without a tag the URL would follow `main`, and every push would update the server. From a checkout of a release tag, `uv tool install ./mcp` does the same. Without installing, `uvx --from "git+https://github.com/phentrieve/ontotator@v0.15.0#subdirectory=mcp" ontotator-mcp` runs it directly.
 
 `ontotator-mcp` has the version of the Ontotator release it comes from (`ontotator-mcp --version`). Use the release your server runs. After installing another release, restart the MCP client: a running `ontotator-mcp` process keeps the code it started with. `whoami` shows both versions and warns when they differ.
 
@@ -78,7 +78,7 @@ Add the server to `claude_desktop_config.json` (Settings › Developer › **Edi
 }
 ```
 
-If the client cannot find the command, give its full path (`which ontotator-mcp`), or use `"command": "uvx"` with `"args": ["--from", "git+https://github.com/phentrieve/ontotator@v0.14.0#subdirectory=mcp", "ontotator-mcp"]`.
+If the client cannot find the command, give its full path (`which ontotator-mcp`), or use `"command": "uvx"` with `"args": ["--from", "git+https://github.com/phentrieve/ontotator@v0.15.0#subdirectory=mcp", "ontotator-mcp"]`.
 
 Ask the client to call `whoami` first: it shows the token's kind, scopes, project and expiry (with a warning two weeks before) and who it acts as. For every kind of token, a project token included, it also shows the version of the Ontotator server (`server`) and of this MCP server (`mcp_server`), with a `warning` when they differ, and whether the [content tools](#content-tools-opt-in) are on (`mcp_server.content_tools`).
 
@@ -311,7 +311,7 @@ This example sets up an HPO annotation project in which annotators check the HPO
 2. **Switch to a project token.** In Settings › People › **Project API tokens**, create a token for `phentrieve-pilot` with `read`, `import`, `export` and `project-admin`, and restart the client with it.
 3. **Settings, guideline and people.**
    *"Set two annotators per text, publish ~/ontotator/pilot/guideline.md as the guideline, and give alice and bob the annotator role and carla the consolidator role."*
-   `update_project_settings` (`{"annotations_per_text": 2}`), `publish_guideline`, `set_member_roles` (consolidator is the role `adjudicator`).
+   `update_project_settings` (`{"annotations_per_text": 2}`), `publish_guideline`, `set_member_roles` (consolidator is the role `adjudicator`; `set_member_roles` and `create_users` take `consolidator` for it).
 4. **Import the proposals.**
    *"Check ~/ontotator/pilot/phentrieve-bundle.zip as an Ontospan bundle and show me the result."* `upload_texts` stages and checks the bundle: cases, texts, proposals, problems and the planned work. *"Import it."* `commit_upload` imports exactly what was checked.
 5. **Work plan and assignments.**

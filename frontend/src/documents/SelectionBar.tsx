@@ -33,7 +33,7 @@ import { finalAppliedText, finalUnavailableReason, FINAL_ACTION_LABELS, taskUndo
 import { BulkModeDialog } from "./BulkModeDialog";
 import { modeAppliedText, modeUnavailableReason, MODE_ACTION_LABEL } from "./bulkModeModel";
 import { BulkPauseDialog } from "./BulkPauseDialog";
-import { pauseAppliedText, pauseUnavailableReason, PAUSE_ACTION_LABELS, type PauseAction } from "./bulkPauseModel";
+import { pauseActionLabel, pauseAppliedText, pauseUnavailableReason, type PauseAction } from "./bulkPauseModel";
 import { BulkTaskDialog } from "./BulkTaskDialog";
 import { PLAN_CHANGED_MESSAGE, UNDO_WITHDRAWN_NOTE, undoneToast, WITHDRAW_CHECKBOX, withdrawnSummary } from "./PlanChips";
 import { PlanDialog } from "./PlanDialog";
@@ -374,7 +374,7 @@ export function SelectionBar({
               { id: "change_mode", label: MODE_ACTION_LABEL, disabled: modeReason !== null, ...(modeReason ? { description: modeReason } : {}), onSelect: () => setModeChange(true) },
               ...(["pause", "release"] as const).map(action => {
                 const reason = pauseUnavailableReason(action, reachable?.[action], rows.length);
-                return { id: `${action}_texts`, label: PAUSE_ACTION_LABELS[action], disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setPauseAction(action) };
+                return { id: `${action}_texts`, label: pauseActionLabel(action, rows.length), disabled: reason !== null, ...(reason ? { description: reason } : {}), onSelect: () => setPauseAction(action) };
               }),
             ]} />
           <Button ref={frontButton} aria-expanded={front} onClick={() => setFront(value => !value)}>{MOVE_TO_FRONT}</Button>

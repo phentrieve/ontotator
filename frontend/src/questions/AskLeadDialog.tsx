@@ -49,7 +49,7 @@ export function AskLeadDialog({ assignment, quote: initialQuote = "", withPropos
     } finally { if (active.current) setBusy(false); }
   };
 
-  return <Dialog open title={ASK_LABEL} size="md" initialFocus={textarea} onClose={busy ? undefined : onClose} footer={<>
+  return <Dialog open title={ASK_LABEL} size="md" className="ask-lead-dialog" initialFocus={textarea} onClose={busy ? undefined : onClose} footer={<>
     {/* Issue 590: what sending does stays in sight, also when the form scrolls (1280 × 720). */}
     <span id={`${id}-consequence`} className="dialog-footer-reason ask-lead-consequence" aria-live="polite">{askConsequence(pause)}</span>
     <Button variant="primary" loading={busy} aria-describedby={`${id}-consequence`} onClick={() => { void send(); }}>{SEND_LABEL}</Button>

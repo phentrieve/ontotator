@@ -663,7 +663,13 @@ def _build_row(ctx: _Context, case_id: str, language: str) -> dict[str, Any]:
         "flagged_round_id": flagged_round,
         "proposal_count": proposal_count,
         "annotation_mode": _annotation_mode(
-            facts, key, versions, row_assignments, proposal_count, planned=annotate
+            facts,
+            key,
+            versions,
+            row_assignments,
+            proposal_count,
+            planned=annotate,
+            review_items=target_document in facts.review_items,
         ),
         "proposal_set": proposal_set,
         "newer_proposal_set": newer_set,
@@ -702,6 +708,7 @@ def _annotation_mode(
     proposal_count: int,
     *,
     planned: bool,
+    review_items: bool = False,
 ) -> dict[str, Any] | None:
     """``AnnotationModeView`` fields (plan "Pure rule"); None for rows that
     are not planned for annotation and have no annotation work."""
@@ -725,6 +732,7 @@ def _annotation_mode(
         plan_override=override,
         proposal_count=proposal_count,
         work_modes=(m for _at, m in sorted(work, key=lambda item: item[0])),
+        review_items=review_items,
     )
     return {
         "mode": mode.mode,
@@ -1160,6 +1168,7 @@ def _old_work(
             # (assigning the target stays open).
             if item.annotation_mode == "proposals" and not (
                 ctx.facts.carry_proposal_counts.get(target.document_id)
+                or target.document_id in ctx.facts.carry_review_items
             ):
                 old_submitted.append(
                     replace(

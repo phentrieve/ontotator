@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MutableRefObject, type ReactNode } from "react";
-import { api, ApiError, type CheckedSentences, type DraftTypographyHints, type ProblemReportView, type ReviewWorkspace, type TaskSummary, type TranslationReviewRecord, type SourceObligationView } from "../api/client";
+import { api, ApiError, type CheckedSentences, type SegmentPairsView, type DraftTypographyHints, type ProblemReportView, type ReviewWorkspace, type TaskSummary, type TranslationReviewRecord, type SourceObligationView } from "../api/client";
 import { ErrorNotice } from "../admin/ErrorNotice";
 import { nextOpenTask } from "../app/caseOrder";
 import { MY_TASKS, routeHref, type Route, type RouteLeaveGuard } from "../app/router";
@@ -15,6 +15,7 @@ import { createDraftSaver, type DraftSaver } from "./draftSaver";
 import { mapOffset, mergeServerText, takeWording, type TakenWording } from "./wordingMerge";
 import { WordingNotices, type MergeTrouble, type WordingNotice } from "./WordingNotices";
 import { DiffView, TextView } from "./DiffView";
+import { diffText } from "./textDiff";
 import { TranslationEditor } from "./TranslationEditor";
 import { SourceObligationReview } from './SourceObligationReview';
 import { notifyFinalSelectionChanged } from '../variants/finalSelectionState';
@@ -32,8 +33,13 @@ import { checkReview, type ClinicalCategory, type ReviewDecisionCode, type Revie
 import { LanguageTag } from "../ui/LanguageTag";
 import { SentenceCount, SentenceView } from "./SentenceMarks";
 import { InvisiblesKey } from "./invisibles";
-import { isChecked, rebaseMarks, resolveMarks, splitSentences, storedMarks, toggled, withRange, type MarkState, type Sentence, type Side, type StoredMarks } from "./sentences";
+import { isChecked, rebaseMarks, resolveMarks, restored, splitSentences, storedMarks, toggled, withRange, type MarkState, type Sentence, type Side, type StoredMarks } from "./sentences";
 import { formatTime } from "../app/submissionLabels";
+import { alignTexts, assessAlignment, isManual, canSplitPair, carryChecks, mergedWithNext, pairsFit, pairsFromSentenceMarks, pairState, precheckAlignment, rebasePairs, securePairs, splitPair, textHash, toggledPair, unsurePairs, type LowConfidenceReason, type SegmentPair } from "./alignment";
+import { PairCount, SegmentPairs } from "./SegmentPairs";
+import { FindBar, type FindBarHandle, type FindHit } from "./FindBar";
+import { indexCells } from "./textRanges";
+import { diffTextBounded } from "./textDiff";
 
 export interface TranslationReviewScreenProps {
   assignmentId: number; username: string; onNavigate: (route: Route) => void;
@@ -94,6 +100,24 @@ const decisionKeys: readonly ReviewDecisionCode[] = OFFERED_DECISIONS;
 /** A lead correction (spec F1, FD4) is submitted only as Accepted with corrections. */
 const leadDecisions: readonly ReviewDecisionCode[] = ["accepted_corrected"];
 const storedOf = (value: CheckedSentences | undefined): StoredMarks => ({ source: value?.source ?? [], translation: value?.translation ?? [] });
+/** Segment pairs as the API stores them (issue 560) and back. */
+const pairsOfView = (view: SegmentPairsView): SegmentPair[] => (view.pairs ?? []).map(pair => ({ source: { ...pair.source }, translation: { ...pair.translation },
+  ...(pair.origin && pair.origin !== "aligner" ? { origin: pair.origin } : {}), ...(pair.checked ? { checked: pair.checked } : {}) }));
+const viewOfPairs = (pairs: readonly SegmentPair[], source: string, target: string): SegmentPairsView => ({ source_hash: textHash(source), text_hash: textHash(target),
+  pairs: pairs.map(pair => ({ source: pair.source, translation: pair.translation, origin: pair.origin ?? "aligner", checked: pair.checked ?? null })) });
+/** Why "Check by segment pairs" shows the usual texts (issue 560): the aligner is not confident about these texts. */
+const PAIRS_FALLBACK: Record<LowConfidenceReason, string> = {
+  "empty": "one of the texts is empty.",
+  "too-long": "the text is too long to pair in the browser.",
+  "one-block": "one text has no sentence ends, so its sentences cannot be told apart.",
+  "counts-differ": "the texts have very different numbers of sentences.",
+  "unrelated": "most numbers and codes of the source are not in the translation.",
+  "gap": "a whole section of one text has no counterpart in the other.",
+  "weak": "too many pairs would be unsure.",
+};
+export function pairsFallbackNote(reason: LowConfidenceReason, touchOnly: boolean): string {
+  return `These texts cannot be shown as pairs: ${PAIRS_FALLBACK[reason]} They are shown as usual${touchOnly ? "." : "; to tick what you checked, use Mark checked sentences."}`;
+}
 const recordForm = (record: TranslationReviewRecord): Record<string, unknown> => ({ decision: record.decision, clinical_change: record.clinical_change, categories: record.categories, rationale: record.rationale });
 
 /** The passage selected in the translation editor (or elsewhere on the page) for "Ask the lead". */
@@ -266,6 +290,18 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     setMarkingOn(on);
     try { window.localStorage.setItem(markingKey, on ? "1" : "0"); } catch { /* Blocked storage: not remembered. */ }
   };
+  // "Check by segment pairs" (issue 560, prototype) starts off; on or off is remembered per user in this browser.
+  const pairsKey = `ontotator.translationReview.segmentPairs.v1:${props.username}`;
+  const [pairsOn, setPairsOn] = useState(() => { try { return window.localStorage.getItem(pairsKey) === "1"; } catch { return false; } });
+  /**
+   * Why the texts are not shown as pairs although the view is on: the aligner is not confident (empty or one-block
+   * text, very different sentence counts, a missing section, too long, ...). Null while pairs are shown or tried.
+   */
+  const [pairsFallback, setPairsFallback] = useState<LowConfidenceReason | null>(null);
+  const choosePairs = (on: boolean) => {
+    setPairsOn(on); setPairsFallback(null); setRealignKept(false);
+    try { window.localStorage.setItem(pairsKey, on ? "1" : "0"); } catch { /* Blocked storage: not remembered. */ }
+  };
   // "Show invisible characters" (issue 454) starts off; on or off is remembered per user in this browser. It only changes how the texts are drawn.
   const invisiblesKey = `ontotator.translationReview.showInvisibles.v1:${props.username}`;
   const [showInvisibles, setShowInvisibles] = useState(() => { try { return window.localStorage.getItem(invisiblesKey) === "1"; } catch { return false; } });
@@ -335,23 +371,107 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
   const record = submitted ?? (immutableReadOnly ? workspace.submitted_record : null);
   const readOnly = immutableReadOnly || submitted !== null || held; readOnlyRef.current = readOnly;
   const text = record?.proposed_text ?? draft.text, rawForm = record ? recordForm(record) : draft.form;
-  /** Marking mode: both texts split into sentences the reviewer ticks, each side on its own. */
-  const marking = markingOn && !readOnly && !touchOnly;
+  /** The rows of segment pairs are shown: the view is on and the texts could be paired with confidence. */
+  const pairView = pairsOn && !readOnly && pairsFallback === null;
+  /** Marking mode: both texts split into sentences the reviewer ticks, each side on its own. Not in the pair view, which has its own checks. */
+  const marking = markingOn && !readOnly && !touchOnly && !pairView;
   const sourceSentences = useMemo(() => marking ? splitSentences(workspace.source.text, workspace.source.variant.language) : [], [marking, workspace]);
   const targetSentences = useMemo(() => marking ? splitSentences(text, workspace.variant.language) : [], [marking, text, workspace]);
   const sourceStates = useMemo(() => resolveMarks(sourceSentences, marks.source), [sourceSentences, marks.source]);
   const targetStates = useMemo(() => resolveMarks(targetSentences, marks.translation), [targetSentences, marks.translation]);
+  /** Show changes while marking: the changes stand inside the translation's sentences (issue 533). */
+  const markedChanges = useMemo(() => marking && showChanges ? diffText(workspace.text, text) : undefined, [marking, showChanges, workspace.text, text]);
   const applyMarks = (side: Side, change: (states: readonly MarkState[]) => MarkState[]) => {
     if (busy) return;
     const [sentences, states] = side === "source" ? [sourceSentences, sourceStates] : [targetSentences, targetStates];
     changeMarks({ ...marks, [side]: storedMarks(sentences, change(states)) });
   };
+  /**
+   * Segment pairs (issue 560, prototype): the source and the translation aligned in rows, each pair checked as one.
+   * Stored pairs are used when they were made on these texts; else the texts are aligned anew, and checks carry over
+   * by source passage and translation (and, the first time, from the checked-sentence marks).
+   */
+  const alignOptions = useMemo(() => ({ sourceLang: workspace.source.variant.language, targetLang: workspace.variant.language }), [workspace]);
+  const [segmentPairs, setSegmentPairs] = useState<SegmentPair[] | null>(() => {
+    const stored = workspace.segment_pairs;
+    if (!stored || stored.source_hash !== textHash(workspace.source.text) || stored.text_hash !== textHash(workspace.draft.text)) return null;
+    const pairs = pairsOfView(stored);
+    return pairsFit(pairs, workspace.source.text, workspace.draft.text) ? pairs : null;
+  });
+  const segmentPairsRef = useRef(segmentPairs); segmentPairsRef.current = segmentPairs;
+  const [pairsError, setPairsError] = useState(false);
+  const pairsTimer = useRef<number | undefined>(undefined), pairsPending = useRef(false);
+  /** The pairs as the server last had them: each save sends them as `base`, so checks of another tab stay. */
+  const pairsBase = useRef<SegmentPairsView | null>(workspace.segment_pairs ?? null);
+  const editingPairRef = useRef<number | null>(null);
+  const sendPairs = (options: { keepalive?: boolean } = {}) => {
+    window.clearTimeout(pairsTimer.current); pairsTimer.current = undefined;
+    const pairs = segmentPairsRef.current;
+    if (!pairsPending.current || !pairs) return Promise.resolve();
+    pairsPending.current = false;
+    const view = viewOfPairs(pairs, workspace.source.text, draftRef.current.text);
+    return api.saveSegmentPairs(props.assignmentId, view, pairsBase.current, options)
+      .then(stored => {
+        pairsBase.current = stored;
+        if (!alive.current) return;
+        setPairsError(false);
+        // The stored pairs hold checks of another tab too: shown once nothing newer waits and no cell is being edited.
+        const same = stored.source_hash === view.source_hash && stored.text_hash === view.text_hash;
+        if (same && !pairsPending.current && editingPairRef.current === null && segmentPairsRef.current === pairs
+          && JSON.stringify(stored.pairs) !== JSON.stringify(view.pairs)) {
+          const next = pairsOfView(stored);
+          if (pairsFit(next, workspace.source.text, draftRef.current.text)) { segmentPairsRef.current = next; setSegmentPairs(next); }
+        }
+      }, () => { pairsPending.current = true; if (alive.current) setPairsError(true); });
+  };
+  const changePairs = (next: SegmentPair[]) => {
+    segmentPairsRef.current = next; setSegmentPairs(next); pairsPending.current = true;
+    window.clearTimeout(pairsTimer.current); pairsTimer.current = window.setTimeout(() => { void sendPairs(); }, 600);
+  };
+  const sendPairsRef = useRef(sendPairs); sendPairsRef.current = sendPairs;
+  useEffect(() => () => { void sendPairsRef.current({ keepalive: true }); }, []);
+  useEffect(() => {
+    if (!pairView || segmentPairsRef.current) return;
+    const source = workspace.source.text, target = draftRef.current.text;
+    // Low confidence: the flowing texts stay, with a note, and nothing is saved, so stored pairs and marks stay as they are.
+    const pre = precheckAlignment(source, target, alignOptions);
+    if (!pre.usable) { setPairsFallback(pre.reason); return; }
+    const fresh = securePairs(source, target, alignTexts(source, target, alignOptions), alignOptions);
+    const assessed = assessAlignment(source, target, fresh, alignOptions);
+    if (!assessed.usable) { setPairsFallback(assessed.reason); return; }
+    const stored = workspace.segment_pairs ? pairsOfView(workspace.segment_pairs) : [];
+    const carried = stored.length ? carryChecks(fresh, stored) : pairsFromSentenceMarks(fresh, source, target, marksRef.current, alignOptions);
+    changePairs(carried);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- aligns once, when the view is first shown; later edits rebase the pairs.
+  }, [pairView]);
+  const [editingPair, setEditingPair] = useState<number | null>(null);
+  editingPairRef.current = editingPair;
+  const pairsChanges = useMemo(() => pairView && showChanges ? diffTextBounded(workspace.text, text) : null, [pairView, showChanges, workspace.text, text]);
+  const pairBusy = busy || !editable;
+  const nextUncheckedPair = () => {
+    const index = (segmentPairs ?? []).findIndex(pair => pairState(text, pair) !== "checked");
+    const element = index < 0 ? null : screenRoot.current?.querySelector<HTMLElement>(`[data-pair-check="${index}"]`);
+    element?.scrollIntoView?.({ block: "center" }); element?.focus({ preventScroll: true });
+  };
+  /** Align again would give pairs of low confidence: the pairs were kept as they are. */
+  const [realignKept, setRealignKept] = useState(false);
+  const realign = () => {
+    const current = segmentPairsRef.current ?? [];
+    // Manual and checked pairs stay; the aligner fills the stretches between them.
+    const fixed = current.filter(pair => isManual(pair) || pair.checked !== undefined);
+    const fresh = securePairs(workspace.source.text, text, alignTexts(workspace.source.text, text, alignOptions, fixed), alignOptions);
+    const assessed = assessAlignment(workspace.source.text, text, fresh, alignOptions);
+    setRealignKept(!assessed.usable);
+    if (assessed.usable) changePairs(fresh);
+  };
+  const unsure = useMemo(() => pairView && segmentPairs ? unsurePairs(workspace.source.text, text, segmentPairs, alignOptions) : new Set<number>(),
+    [pairView, segmentPairs, text, workspace.source.text, alignOptions]);
   const sideCount = (states: readonly MarkState[]) => ({ checked: states.filter(isChecked).length, total: states.length, stale: states.filter(state => state?.kind === "stale").length });
   // Issue 590: a draft that still holds the retired Query lists that first; the form's own issues follow a new decision.
   const form = typedForm(rawForm), issues = form && form.decision !== "query" ? checkReview(form, workspace.text, text, workspace.failed_checks.length > 0) : [];
   const comparison = comparisonOpen ? comparisons.find(row => row.id === comparisonId) : undefined;
   /** The editable translation is shown: it is the fixed leader and its pairing waits for a recompute (spec 2.2, 2.3). */
-  const editing = !readOnly && !showChanges && !marking;
+  const editing = !readOnly && !showChanges && !marking && !pairView;
   const sourceStarts = useMemo(() => paragraphStarts(workspace.source.text), [workspace.source.text]);
   const comparisonStarts = useMemo(() => paragraphStarts(comparison?.text ?? ""), [comparison?.text]);
   /** Translation starts lag the text while editing: 300 ms after the last edit, at once on blur, never during composition. */
@@ -547,7 +667,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     if (leavePromise.current) return leavePromise.current;
     // Waiting marks are sent first, so a reload cannot read the marks before them (issue 284).
     // They are a working aid: a failed save of them does not keep the reviewer here.
-    const marksSent = flushMarks();
+    const marksSent = Promise.all([flushMarks(), sendPairs()]);
     if (!saver.current?.hasUnsavedChanges) return marksSent.then(() => true);
     const promise = (async () => {
       await marksSent;
@@ -583,6 +703,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     const warn = (event: BeforeUnloadEvent) => {
       // Marks are sent on their own, so they are not lost within the debounce (issue 284).
       latest.current.unloadMarks();
+      void sendPairsRef.current({ keepalive: true });
       if (saver.current?.hasUnsavedChanges) { event.preventDefault(); event.returnValue = ""; }
     };
     window.addEventListener("beforeunload", warn);
@@ -689,10 +810,12 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     const translation = rebaseMarks(before, beforeText, after, afterText, current.translation);
     if (JSON.stringify(translation) !== JSON.stringify(current.translation)) changeMarks({ ...current, translation });
   };
-  const editText = (nextText: string) => {
+  const editText = (nextText: string, inPair?: number) => {
     if (readOnlyRef.current || operation.current) return;
     const current = draftRef.current;
     rebaseTranslationMarks(current.text, nextText);
+    // The segment pairs follow the edit: an edit inside one pair resizes it, one across pairs aligns those again.
+    if (segmentPairsRef.current) changePairs(rebasePairs(segmentPairsRef.current, workspace.source.text, current.text, nextText, alignOptions, inPair));
     const result = reactToTextEdit(decisionStateRef.current, current.form, workspace.text, nextText);
     // The whole returned form, so undoing an automatic selection can remove the decision again.
     edit({ text: nextText, form: result.form === current.form ? result.form : withClinicalDefault(result.form) });
@@ -751,6 +874,9 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
     setMergeTrouble(null);
     if (next !== current) {
       rebaseTranslationMarks(current.text, next.text);
+      // A taken wording moves the segment pairs as an edit does (issue 560).
+      if (segmentPairsRef.current && next.text !== current.text)
+        changePairs(rebasePairs(segmentPairsRef.current, workspace.source.text, current.text, next.text, alignOptions));
       decisionStateRef.current = decisionNext; setDecisionState(decisionNext);
       const editor = document.getElementById("review-translation");
       if (editor instanceof HTMLTextAreaElement && document.activeElement === editor)
@@ -875,6 +1001,39 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
       .forEach(element => observer.observe(element));
     return () => observer.disconnect();
   }, [wide, railOpen, readOnly, showChanges, comparisonId, comparisonOpen, coupled, marking]);
+  /**
+   * Find in the texts (Ctrl+F, Cmd+F on a Mac), from the prototype of issue 533; a second press inside the bar leaves
+   * it to the browser's own find. With segment pairs, each side is found in its cells.
+   */
+  const [findOpen, setFindOpen] = useState(false);
+  const findBar = useRef<FindBarHandle | null>(null), beforeFind = useRef<HTMLElement | null>(null);
+  const [pairsElement, setPairsElement] = useState<HTMLDivElement | null>(null);
+  const openFind = () => {
+    if (findBar.current?.hasFocus()) return false;
+    const active = document.activeElement;
+    beforeFind.current = active instanceof HTMLElement && active !== document.body ? active : null;
+    // The selected words, when they fit on one line, are what to find.
+    const field = active instanceof HTMLTextAreaElement ? active.value.slice(active.selectionStart, active.selectionEnd) : window.getSelection()?.toString() ?? "";
+    const initial = field && field.length <= 80 && !/\n/.test(field) ? field : undefined;
+    setFindOpen(true);
+    window.requestAnimationFrame(() => findBar.current?.focus(initial));
+  };
+  const closeFind = (hit: FindHit | null) => {
+    setFindOpen(false);
+    const textarea = hit?.pane === "target" && !pairView ? targetElement?.querySelector("textarea") : null;
+    // Closing on a hit in the editable translation selects it there, ready to change.
+    if (textarea && !textarea.readOnly) { textarea.focus({ preventScroll: true }); textarea.setSelectionRange(hit!.start, hit!.end); return; }
+    beforeFind.current?.focus({ preventScroll: true });
+  };
+  // Only in the pair view: without it, Ctrl+F stays the browser's own find, as before (issue 560).
+  useShortcut(["Ctrl+f", "Meta+f"], openFind, { scope: "screen", group: "Translation review", description: "Find in the texts (press again for the browser's find)", allowInInputs: true, enabled: pairView });
+  useEffect(() => { if (!pairView) setFindOpen(false); }, [pairView]);
+  const findPanes = pairView
+    ? [{ id: "source", name: "Source", element: pairsElement, text: workspace.source.text, index: (element: HTMLElement) => indexCells(element, "source") },
+       { id: "target", name: "Translation", element: pairsElement, text, index: (element: HTMLElement) => indexCells(element, "translation") }]
+    : [{ id: "source", name: "Source", element: sourceElement, text: workspace.source.text },
+       { id: "target", name: "Translation", element: targetElement, text },
+       ...(comparison ? [{ id: "comparison", name: "Comparison", element: comparisonElement, text: comparison.text }] : [])];
   const closeDetails = (event: KeyboardEvent<HTMLDetailsElement>) => {
     if (event.key !== "Escape" || !event.currentTarget.open) return;
     event.preventDefault(); event.stopPropagation();
@@ -966,7 +1125,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
         {!readOnly && props.headerTimer}
         {props.guidelineActions}
         {!leadCorrection && !readOnly && <Button size="sm" className="ask-lead-entry" onMouseDown={event => event.preventDefault()}
-          onClick={() => setAsking({ quote: selectedPassage() })}>{ASK_LABEL}</Button>}
+          onClick={() => setAsking({ quote: selectedPassage() })}>{`${ASK_LABEL}…`}</Button>}
         {!leadCorrection && props.reportActions}
         <span role="status" className="translation-save-status"><StatusBadge tone={statusTone}>{status}</StatusBadge></span>
         <Button size="sm" icon={<IconRetry />} onClick={() => { void reload(); }}
@@ -981,12 +1140,13 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
       style={railOpen ? { "--review-panel-width": `${panel.width}px` } as CSSProperties : undefined}>
       <div className="translation-texts">
         <div className="translation-tools" role="group" aria-label="Text view">
-          {!readOnly && !touchOnly && <Checkbox id="review-mark-checked" label="Mark checked sentences" checked={marking} onChange={event => chooseMarking(event.target.checked)} />}
-          {!readOnly && !touchOnly && <span className="translation-tools-divider" aria-hidden="true" />}
-          <Checkbox id="review-show-changes" label="Show changes" checked={showChanges && !marking} disabled={marking} onChange={event => setShowChanges(event.target.checked)} />
-          {pairing.available && <Checkbox id="review-couple" label="Couple scrolling" checked={coupled} onChange={event => setRequestedCoupling(event.target.checked ? couplingIdentity : null)} />}
+          {!readOnly && <Checkbox id="review-segment-pairs" label="Check by segment pairs" checked={pairsOn} onChange={event => choosePairs(event.target.checked)} />}
+          {!readOnly && !touchOnly && !pairView && <Checkbox id="review-mark-checked" label="Mark checked sentences" checked={marking} onChange={event => chooseMarking(event.target.checked)} />}
+          {!readOnly && <span className="translation-tools-divider" aria-hidden="true" />}
+          <Checkbox id="review-show-changes" label="Show changes" checked={showChanges} onChange={event => setShowChanges(event.target.checked)} />
+          {pairing.available && !pairView && <Checkbox id="review-couple" label="Couple scrolling" checked={coupled} onChange={event => setRequestedCoupling(event.target.checked ? couplingIdentity : null)} />}
           <Checkbox id="review-show-invisibles" label="Show invisible characters" checked={showInvisibles} onChange={event => chooseInvisibles(event.target.checked)} />
-          <div className="translation-tools-end">
+          {!pairView && <div className="translation-tools-end">
             <Button ref={matchButton} size="sm" title={showMatchingTitle} aria-keyshortcuts="Alt+M" onMouseDown={event => event.preventDefault()} onClick={showMatching}>
               {showMatchingLabel}<span aria-hidden="true"> <Kbd>Alt M</Kbd></span></Button>
             {!comparison && (comparisons.length === 1
@@ -994,18 +1154,46 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
                   onClick={() => showComparison(true, comparisons[0].id)}>Compare</Button>
               : comparisons.length > 1 && <MenuButton className="translation-compare-open" label="Compare with…" buttonLabel="Compare"
                 items={comparisons.map(row => ({ id: row.id, label: row.name.replace(/^t/, "T"), onSelect: () => showComparison(true, row.id) }))} />)}
-          </div>
+          </div>}
+          {pairView && <div className="translation-tools-end">
+            {segmentPairs && <PairCount target={text} pairs={segmentPairs} />}
+            <Button size="sm" onClick={nextUncheckedPair} disabled={!segmentPairs || segmentPairs.every(pair => pairState(text, pair) === "checked")}>Next unchecked</Button>
+            <Button size="sm" onClick={realign} disabled={pairBusy || showChanges} title="Align the texts again. Checked pairs and pairs you merged or split stay as they are.">Align again</Button>
+          </div>}
+          {pairsError && pairView && <p className="sentence-save-error" role="alert">Checked pairs are not saved. <Button size="sm" variant="quiet" onClick={() => { pairsPending.current = true; void sendPairs(); }}>Retry</Button></p>}
+          {pairsOn && !readOnly && pairsFallback && <p className="translation-pairs-fallback" role="status">{pairsFallbackNote(pairsFallback, touchOnly)}</p>}
+          {realignKept && pairView && <p className="translation-pairs-fallback" role="status">Aligning again would give unsure pairs, so your pairs were kept.</p>}
+          {findOpen && pairView && <FindBar ref={findBar} onClose={closeFind} panes={findPanes} />}
           {marksError && marking && <p className="sentence-save-error" role="alert">Checked sentences are not saved. <Button size="sm" variant="quiet" onClick={() => { pendingMarks.current ??= marks; sendMarks(); }}>Retry</Button></p>}
           {showInvisibles && <InvisiblesKey />}
         </div>
-        <div className={`translation-columns${comparison ? " translation-columns--comparison" : ""}`}>
+        {pairView && <div className="translation-pairs-view">
+          {segmentPairs
+            ? <SegmentPairs ref={setPairsElement} source={workspace.source.text} target={text} pairs={segmentPairs} sourceLang={sourceLanguage} targetLang={targetLanguage}
+                changes={pairsChanges} unsure={unsure} editable={!showChanges && !pairBusy} disabled={pairBusy} showInvisibles={showInvisibles} editing={editingPair}
+                onEditStart={setEditingPair} onEditEnd={() => setEditingPair(null)}
+                onEditPair={(index, value) => {
+                  const pair = segmentPairs[index];
+                  editText(text.slice(0, pair.translation.start) + value + text.slice(pair.translation.end), index);
+                }}
+                onToggle={index => changePairs(toggledPair(segmentPairs, text, index))}
+                onMerge={index => changePairs(mergedWithNext(segmentPairs, text, index))}
+                onSplit={index => { const next = splitPair(segmentPairs, workspace.source.text, text, index, alignOptions); if (next) changePairs(next); }}
+                canSplit={index => canSplitPair(workspace.source.text, text, segmentPairs[index])} />
+            : <p className="task-loading" role="status">Aligning the texts…</p>}
+          <p id="review-translation-note" className="translation-column-note">{showChanges
+            ? "Each row is one pair: a part of the source and its translation. Turn off Show changes to edit."
+            : "Each row is one pair: a part of the source and its translation. Check a pair with the box at the end of its row. Click a translation to edit it. Use ⋯ to merge or split pairs."}</p>
+        </div>}
+        {!pairView && <div className={`translation-columns${comparison ? " translation-columns--comparison" : ""}`}>
           <div className="translation-column">
             <div className="translation-column-head density-compact"><h2 className="translation-column-title">Source <LanguageTag code={sourceLanguage} /></h2>
               {marking && <SentenceCount name="Source" count={sideCount(sourceStates)} />}</div>
             {marking
               ? <SentenceView ref={setSourceElement} text={workspace.source.text} sentences={sourceSentences} states={sourceStates} label={`Source (${sourceLanguage})`} lang={sourceLanguage}
                   disabled={busy} showInvisibles={showInvisibles} onToggle={index => applyMarks("source", states => toggled(states, index))}
-                  onRange={(from, to, checked) => applyMarks("source", states => withRange(states, from, to, checked))} />
+                  onRange={(from, to, checked) => applyMarks("source", states => withRange(states, from, to, checked))}
+                  onRestore={(index, state) => applyMarks("source", states => restored(states, index, state))} />
               : <TextView ref={setSourceElement} text={workspace.source.text} label={`Source (${sourceLanguage})`} lang={sourceLanguage} showInvisibles={showInvisibles} />}
           </div>
           <div className="translation-column">
@@ -1019,8 +1207,9 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
             </div>
             {marking
               ? <SentenceView ref={setTargetElement} text={text} sentences={targetSentences} states={targetStates} label={`Translation (${targetLanguage})`} lang={targetLanguage}
-                  disabled={busy} showInvisibles={showInvisibles} onToggle={index => applyMarks("translation", states => toggled(states, index))}
-                  onRange={(from, to, checked) => applyMarks("translation", states => withRange(states, from, to, checked))} />
+                  disabled={busy} showInvisibles={showInvisibles} changes={markedChanges} onToggle={index => applyMarks("translation", states => toggled(states, index))}
+                  onRange={(from, to, checked) => applyMarks("translation", states => withRange(states, from, to, checked))}
+                  onRestore={(index, state) => applyMarks("translation", states => restored(states, index, state))} />
               : showChanges
               ? <DiffView ref={setTargetElement} before={workspace.text} after={text} lang={targetLanguage} showInvisibles={showInvisibles} />
               : <TranslationEditor ref={setTargetElement} id="review-translation" labelledBy="review-translation-label" describedBy="review-translation-note"
@@ -1030,7 +1219,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
                   onCompositionStart={() => { composing.current = true; window.clearTimeout(startsTimer.current); }}
                   onCompositionEnd={() => { composing.current = false; scheduleStarts(); }} />}
             <p id="review-translation-note" className="translation-column-note">{marking
-              ? "Click a sentence to mark it as checked. Turn off Mark checked sentences to edit."
+              ? showChanges ? "Click a sentence to mark it as checked. Turn off Mark checked sentences and Show changes to edit." : "Click a sentence to mark it as checked. Turn off Mark checked sentences to edit."
               : translationNote(workspace.variant, showChanges ? "changes" : changed ? "edited" : "same", previousVersion?.variant.version)}</p>
           </div>
           {comparison && <div className="translation-column">
@@ -1054,7 +1243,7 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
             {comparison && comparisonStarts.length !== targetStarts.length && <span>{comparisonCountsDiffer(targetStarts.length, comparisonStarts.length)}</span>}
             <span aria-live="polite">{targetStarts.length !== loadedCount && paragraphCountChanged(loadedCount, targetStarts.length)}</span>
           </p>}
-        </div>
+        </div>}
       </div>
       <aside className={`translation-decision density-compact${wide && panelCollapsed ? " translation-decision--collapsed" : ""}`} aria-labelledby="translation-decision-heading">
         {railOpen && <SidebarResizer side="start" label="Resize review panel" hint="Resize the review panel (focus the divider)" controls="translation-decision-body"
@@ -1077,7 +1266,8 @@ function ReviewEditor({ workspace, onReload, ...props }: TranslationReviewScreen
             onDismiss={notice => setWordingNotices(notices => notices.filter(other => other !== notice))}
             onKeepMine={keepMine} onLoadSaved={() => { void reload(); }} onRetry={() => { setMergeTrouble(null); void sync(); }} />}
           {!leadCorrection && <TaskQuestionList assignment={workspace.assignment} state={questions} withProposal readOnly={readOnly}
-            selectedText={selectedPassage} onShowInText={question => { void showWording(question); }} dialogOpen={asking} onDialogOpen={setAsking}
+            selectedText={selectedPassage} onShowInText={question => { void showWording(question); }}
+            wordingInText={question => !!question.proposed_text && text.includes(question.proposed_text)} dialogOpen={asking} onDialogOpen={setAsking}
             // Issue 590: a pausing question pauses the task at once, as a problem report does; a resume opens it again.
             onSaveBeforePause={async () => { await flush(); }} onAsked={clearPassage} onPauseChanged={() => onTaskHeld.current?.()} />}
           <SourceObligationReview assignmentId={props.assignmentId} username={props.username} documentId={workspace.variant.document_id}

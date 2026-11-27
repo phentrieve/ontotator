@@ -12,6 +12,7 @@ import { useDocumentsSummary } from "../documents/useDocumentsSummary";
 import { TASKS_CHANGED } from "../tasks/tasksEvents";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { useNotifications } from "../notifications/useNotifications";
+import { NOTIFICATIONS_CHANGED } from "../notifications/notificationsEvents";
 import { notifyQuestionsChanged, QUESTIONS_CHANGED } from "../questions/questionsEvents";
 import { TechnicalReportHost } from "../reports/TechnicalReportDialog";
 import { TECHNICAL_REPORTS_CHANGED } from "../reports/TechnicalReportsPage";
@@ -26,7 +27,7 @@ export interface ShellProps {
   breadcrumb?: Crumb[];
   children: ReactNode;
   taskProject?: string;
-  /** The open task's kind: an annotator on a translation review reads as "Translation reviewer". */
+  /** The open task's kind: on a translation review the role line adds the task ("Annotator · translation review"). */
   taskKind?: string;
   /** Changes on each navigation to My tasks or Projects; the My tasks count reloads then (issue 192). */
   navigation?: unknown;
@@ -59,14 +60,18 @@ function NavigationLink({ destination, current, onNavigate, label, children }: {
 
 const ROLE_ORDER = ["lead", "adjudicator", "annotator"] as const;
 
-/** Second header line: the roles in the current project, else across all projects. */
+/**
+ * Second header line: the roles in the current project, else across all projects. Issue 611: the same person reads
+ * the same role everywhere; inside a translation review the task is named after the role, not in place of it.
+ */
 export function shellRole(user: CurrentUser, projects: readonly ProjectSummary[], current: ProjectSummary | undefined, taskKind?: string): string | undefined {
   const roles = new Set((current ? [current] : projects).flatMap(project => project.roles));
   const labels = [
     ...(user.is_system_admin ? ["System administrator"] : []),
-    ...ROLE_ORDER.filter(role => roles.has(role)).map(role => role === "annotator" && taskKind === "translation_review" ? "Translation reviewer" : roleLabels[role]),
+    ...ROLE_ORDER.filter(role => roles.has(role)).map(role => roleLabels[role]),
   ];
-  return labels.length ? labels.join(", ") : undefined;
+  if (!labels.length) return undefined;
+  return `${labels.join(", ")}${taskKind === "translation_review" && roles.has("annotator") ? " · translation review" : ""}`;
 }
 
 /**
@@ -120,7 +125,8 @@ function useOpenQuestionCount(projectKey: string | undefined, navigation: unknow
     let active = true;
     setCount(null);
     if (!projectKey) return;
-    // Issue 590: also after an answer on the Questions page and on window focus, so the count equals the Open tab.
+    // Issue 590: also after an answer on the Questions page and on window focus, so the count equals the Open tab;
+  // issue 629: and when the bell's count changes.
     let request = 0;
     const load = () => {
       const mine = ++request;
@@ -128,8 +134,14 @@ function useOpenQuestionCount(projectKey: string | undefined, navigation: unknow
     };
     load();
     window.addEventListener(QUESTIONS_CHANGED, load);
+    window.addEventListener(NOTIFICATIONS_CHANGED, load);
     window.addEventListener("focus", load);
-    return () => { active = false; window.removeEventListener(QUESTIONS_CHANGED, load); window.removeEventListener("focus", load); };
+    return () => {
+      active = false;
+      window.removeEventListener(QUESTIONS_CHANGED, load);
+      window.removeEventListener(NOTIFICATIONS_CHANGED, load);
+      window.removeEventListener("focus", load);
+    };
   }, [projectKey, navigation]);
   return count;
 }
@@ -167,6 +179,16 @@ export function Shell({ user, projects, route, onNavigate, onLogout, breadcrumb,
   const openTasks = useOpenTaskCount(user.username, navigation);
   const openReports = useOpenReportCount(user.is_system_admin, navigation);
   const notifications = useNotifications(user.username);
+  // Issue 620: a move inside the app is a cheap moment to read the bell's count again (not on the first render,
+  // where the hook loads it anyway).
+  const place = routeHref(route);
+  const firstPlace = useRef(place);
+  const { refresh: refreshNotifications } = notifications;
+  useEffect(() => {
+    if (place === firstPlace.current) return;
+    firstPlace.current = "";
+    refreshNotifications();
+  }, [place, refreshNotifications]);
   // "Documents (n)": rows needing the lead's decision (V3); the summary is lead only.
   const needsDecision = useDocumentsSummary(current?.project_key, !!current?.can_manage && current.roles.includes("lead"));
   const openQuestions = useOpenQuestionCount(current?.can_manage && current.roles.includes("lead") ? current.project_key : undefined, navigation);

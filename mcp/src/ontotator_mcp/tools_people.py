@@ -372,7 +372,10 @@ def register_people(
             }
             if project is not None:
                 body["projects"] = [
-                    {"project_key": project, "roles": person.roles or ["annotator"]}
+                    {
+                        "project_key": project,
+                        "roles": list(dict.fromkeys(person.roles)) or ["annotator"],
+                    }
                 ]
             try:
                 answer = await api.post("/api/v1/admin/users/", body)

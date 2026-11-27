@@ -1,5 +1,5 @@
 import { CopyTextButton } from "../editor/CopyTextButton";
-import { KEEP_MINE, LOAD_SAVED, SYNC_FAILED, UNMERGED_TEXT, UNMERGED_TITLE, USE_WORDING, WORDING_KEPT_HINT, WORDING_KEPT_TITLE, wordingApplied, wordingKept } from "../questions/labels";
+import { KEEP_MINE, LOAD_SAVED, SYNC_FAILED, UNMERGED_TEXT, UNMERGED_TITLE, USE_WORDING, WORDING_KEPT_HINT, WORDING_KEPT_TITLE, wordingApplied, wordingKept, wordingReplaces } from "../questions/labels";
 import { Button, InlineMessage } from "../ui";
 import type { TakenWording } from "./wordingMerge";
 
@@ -51,6 +51,8 @@ export function WordingNotices({ notices, trouble, text, busy, onUse, onDismiss,
         </InlineMessage>
       : <InlineMessage key={notice.wording.report_id} tone="warning" title={WORDING_KEPT_TITLE} onDismiss={() => onDismiss(notice)}>
           <p>{wordingKept(notice.wording.quote, notice.wording.proposed_text)}</p>
+          {/* Issue 616: what the button replaces, so a rewrite of several words is seen before it goes. */}
+          {once(text, notice.mine) && <p className="field-hint">{wordingReplaces(notice.mine)}</p>}
           <div className="toolbar">
             {once(text, notice.mine)
               ? <Button size="sm" onClick={() => onUse(notice)}>{USE_WORDING}</Button>

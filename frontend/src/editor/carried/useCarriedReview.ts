@@ -32,7 +32,7 @@ export interface CarriedReview {
   placeholders: CarriedState[];
   openKeys: Set<string>;
   progress: string;
-  /** inputId -> annotationId of the finding re-created via "Mark in text" (client-side only). */
+  /** inputId -> annotationId of the finding re-created via "Mark in text", read from the finding's ID (issue 652). */
   recreatedFor: Record<string, string>;
   busy(inputId: string): boolean;
   /** Each write resolves true only when the server applied it; false when it was refused or not sent. */
@@ -42,7 +42,6 @@ export interface CarriedReview {
   dismiss(state: CarriedState, reason: string): Promise<boolean>;
   /** Clears the resolution; the server restores a finding the dismissal removed. */
   undoDismissal(state: CarriedState): Promise<boolean>;
-  rememberRecreated(inputId: string, annotationId: string): void;
   errorFor(inputId: string): CarriedError | null;
   /** Clears a settled error (e.g. an unsaved-note error after the note was saved). */
   clearError(inputId: string): void;
@@ -55,6 +54,29 @@ type Send = (envelope: MutationEnvelope) => Promise<Draft>;
 const statesOf = (inputs: readonly RoundInputView[], draft: Draft): CarriedState[] =>
   deriveCarriedStates(inputs, draft.round_input_resolutions ?? [], draft.annotations ?? []);
 
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const RECREATED_ID = new RegExp(`^ann-re-(.+)-${UUID}$`);
+
+/**
+ * The ID of a finding re-created via "Mark in text" for a carried input: it names the input, so the link to the
+ * input is part of the saved draft and survives a reload, while the input stays "Check needed" until it is marked
+ * as checked (issue 652).
+ */
+export const recreatedAnnotationId = (inputId: string): string => `ann-re-${inputId}-${crypto.randomUUID()}`;
+
+/** The input a finding was re-created for (see `recreatedAnnotationId`); null for any other finding. */
+export const recreatedInputOf = (annotationId: string): string | null => RECREATED_ID.exec(annotationId)?.[1] ?? null;
+
+/** inputId -> the latest finding of the draft re-created for that input. */
+export function recreatedLinks(inputs: readonly RoundInputView[], annotations: Draft["annotations"]): Record<string, string> {
+  const known = new Set(inputs.map(input => input.input_id)), links: Record<string, string> = {};
+  for (const snapshot of annotations ?? []) {
+    const inputId = recreatedInputOf(snapshot.annotation.annotation_id);
+    if (inputId !== null && known.has(inputId)) links[inputId] = snapshot.annotation.annotation_id;
+  }
+  return links;
+}
+
 const termSnapshot = (state: CarriedState): SnapshotLike => state.input.target_snapshot ?? state.input.source_snapshot;
 
 export function useCarriedReview(args: UseCarriedReviewArgs): CarriedReview {
@@ -63,10 +85,10 @@ export function useCarriedReview(args: UseCarriedReviewArgs): CarriedReview {
   latest.current = args;
   const [pending, setPending] = useState<Record<string, CarriedAction>>({});
   const [errors, setErrors] = useState<Record<string, CarriedError>>({});
-  const [recreatedFor, setRecreatedFor] = useState<Record<string, string>>({});
   const pendingRef = useRef(new Set<string>());
 
   const states = useMemo(() => statesOf(inputs, draft), [inputs, draft]);
+  const recreatedFor = useMemo(() => recreatedLinks(inputs, draft.annotations), [inputs, draft]);
   const byHome = useMemo(() => {
     const map = new Map<string, CarriedState[]>();
     for (const state of states) if (state.homeId) map.set(state.homeId, [...(map.get(state.homeId) ?? []), state]);
@@ -181,7 +203,6 @@ export function useCarriedReview(args: UseCarriedReviewArgs): CarriedReview {
     link: (state, annotationId) => complete(state, annotationId),
     dismiss,
     undoDismissal,
-    rememberRecreated: (inputId, annotationId) => setRecreatedFor(current => ({ ...current, [inputId]: annotationId })),
     errorFor: inputId => {
       const action = pending[inputId];
       if (action && queueFailed) return { kind: isSessionProblem(queue.getLastError()) ? "session" : "network", action };

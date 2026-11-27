@@ -17,6 +17,7 @@ const open = () => within(panel()).getByRole("button", { name: "Open translation
 beforeEach(() => {
   vi.spyOn(api, "getVariantMetadata").mockResolvedValue({ document_id: "case-0101-de", text_sha256: "sha-v2" } as VariantSummary);
   vi.spyOn(api, "startLeadCorrection");
+  vi.spyOn(api, "getProfile").mockResolvedValue({ qualification: "physician" } as Awaited<ReturnType<typeof api.getProfile>>);
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -49,6 +50,24 @@ it("asks for language confirmation only on LANGUAGE_CONFIRMATION_REQUIRED", asyn
   await waitFor(() => expect(props.onNavigate).toHaveBeenCalledWith({ name: "task", assignmentId: 42 }));
 });
 
+// Issue 629: the profile languages are known in advance, so the first click does not meet a 409.
+it("shows the language confirmation before the first attempt when the preview names missing languages", async () => {
+  vi.spyOn(api, "getLeadCorrectionPreview").mockResolvedValue(preview({ document_id: "case-0101-de", version: 2, next_version: 3, translation_status: "reviewed",
+    reviewed_again: false, annotations: { submitted: 0, open: 0 }, missing_languages: ["es"] }));
+  vi.mocked(api.startLeadCorrection).mockResolvedValue(assignment(44));
+  const props = renderPanel();
+  const checkbox = await within(panel()).findByRole("checkbox", { name: "Correct despite missing es in your profile" });
+  expect(api.getLeadCorrectionPreview).toHaveBeenCalledWith("p", "case-0101-de");
+  expect(open().getAttribute("aria-disabled")).toBe("true");
+  fireEvent.click(open());
+  expect(api.startLeadCorrection).not.toHaveBeenCalled();
+  fireEvent.click(checkbox);
+  fireEvent.click(open());
+  await waitFor(() => expect(api.startLeadCorrection).toHaveBeenCalledWith("p", "case-0101-de", { expected_text_sha256: "sha-v2", confirm_language: true }));
+  expect(api.startLeadCorrection).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(props.onNavigate).toHaveBeenCalledWith({ name: "task", assignmentId: 44 }));
+});
+
 it("shows the qualification message with a profile link", async () => {
   vi.mocked(api.startLeadCorrection).mockRejectedValueOnce(new ApiError(409, "qualification", "QUALIFICATION_REQUIRED"));
   const props = renderPanel();
@@ -58,6 +77,18 @@ it("shows the qualification message with a profile link", async () => {
   fireEvent.click(link);
   expect(props.onNavigate).toHaveBeenCalledWith({ name: "me", documents: "p" });
   expect(within(panel()).queryByRole("checkbox")).toBeNull();
+});
+
+it("says up front that the profile has no qualification and keeps Open unavailable (issue 613)", async () => {
+  vi.mocked(api.getProfile).mockResolvedValue({ qualification: "  " } as Awaited<ReturnType<typeof api.getProfile>>);
+  const props = renderPanel();
+  await within(panel()).findByText("A translation review records your qualification. Your profile has none yet.");
+  expect(open().getAttribute("aria-disabled")).toBe("true");
+  expect(document.getElementById(open().getAttribute("aria-describedby")!)?.textContent).toBe("A translation review records your qualification. Your profile has none yet.");
+  fireEvent.click(open());
+  expect(api.startLeadCorrection).not.toHaveBeenCalled();
+  fireEvent.click(within(panel()).getByRole("link", { name: "Add your qualification in your profile" }));
+  expect(props.onNavigate).toHaveBeenCalledWith({ name: "me", documents: "p" });
 });
 
 it("shows LEAD_CORRECTION_NOT_AVAILABLE reasons in words", async () => {
@@ -104,7 +135,7 @@ const acceptedRow = () => planRow("case-0101", "de", stepOf("annotation_in_progr
   versions: [version({ document_id: "case-0101-de", version: 1, chain_name: "DeepL", origin: "machine_translation", translation_status: "accepted" })],
 });
 const preview = (overrides: Partial<LeadCorrectionPreview> = {}): LeadCorrectionPreview => ({
-  document_id: "case-0101-de", version: 1, next_version: 2, translation_status: "accepted", available: true, reason: null,
+  document_id: "case-0101-de", version: 1, next_version: 2, translation_status: "accepted", available: true, reason: null, missing_languages: [],
   reviewed_again: true, review_on: false, annotate_accepted_only: false, annotations: { submitted: 2, open: 1 }, open_consolidations: 0, final_result: false, ...overrides,
 });
 

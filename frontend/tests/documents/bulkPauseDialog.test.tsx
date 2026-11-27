@@ -5,7 +5,7 @@ import { errorMessage } from "../../src/admin/errors";
 import { pausedAssignText } from "../../src/admin/AssignWorkDialog";
 import { consequenceLines, pausedTextsLine, previewGroups } from "../../src/documents/bulkActionModel";
 import { BulkPauseDialog } from "../../src/documents/BulkPauseDialog";
-import { pauseAppliedText, pauseApplyLabel, pauseConsequences, pauseGroups, pauseSummaryText, pauseUnavailableReason } from "../../src/documents/bulkPauseModel";
+import { pauseActionLabel, pauseAppliedText, pauseApplyLabel, pauseTitle, pauseConsequences, pauseGroups, pauseSummaryText, pauseUnavailableReason } from "../../src/documents/bulkPauseModel";
 import { leadPauseLine, pausedWord } from "../../src/documents/labels";
 import { stageText } from "../../src/documents/stageLabels";
 import { pauseMarks, pauseNotice, REPORT_WAY_OUT } from "../../src/tasks/pauseLabels";
@@ -176,4 +176,12 @@ it("Documents words: the stage cell, the text card line, bulk previews and the a
 
   expect(pausedAssignText(1, true)).toBe("This text is paused by a lead. A task assigned now is paused from the start (“Paused by lead” in My tasks) until you release the text.");
   expect(pausedAssignText(2, false)).toBe("2 of the selected texts are paused by a lead. Tasks assigned there are paused from the start (“Paused by lead” in My tasks) until you release the texts.");
+});
+
+it("names one selected text in the singular (issue 613)", () => {
+  expect(pauseActionLabel("pause", 1)).toBe("Pause text…");
+  expect(pauseActionLabel("release", 1)).toBe("Release text…");
+  expect(pauseActionLabel("pause", 2)).toBe("Pause texts…");
+  expect(pauseTitle("release", 3)).toBe("Release texts");
+  expect(pauseTitle("pause", 1)).toBe("Pause text");
 });

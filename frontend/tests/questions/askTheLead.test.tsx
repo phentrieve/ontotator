@@ -6,9 +6,11 @@ import { toolbarEntry } from "../../src/problems/labels";
 import { pausedByProblem, pausedByQuestion, pauseNotice, QUESTION_PAUSE_TITLE, REPORT_WAY_OUT } from "../../src/tasks/pauseLabels";
 import { AnswerQuestionDialog } from "../../src/questions/AnswerQuestionDialog";
 import { AskLeadDialog } from "../../src/questions/AskLeadDialog";
-import { QuestionItem } from "../../src/questions/TaskQuestionList";
+import { QuestionItem, TaskQuestionList } from "../../src/questions/TaskQuestionList";
+import { QuestionsPage } from "../../src/questions/QuestionsPage";
+import type { TaskQuestions } from "../../src/questions/useTaskQuestions";
 import { askConsequence, questionStatus } from "../../src/questions/labels";
-import { report } from "../problems/fixtures";
+import { event, hold, report } from "../problems/fixtures";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 // The dialog reads the task as it is now before it sends (issue 590): an earlier pause moved its revision.
@@ -167,4 +169,59 @@ it("tells the lead to answer without the wording when the passage is gone", () =
     .toBe("The quoted passage is no longer in the reviewer's text, so the wording cannot be taken. Untick “Take the proposed wording…” and send the answer without it.");
   expect(errorMessage(new ApiError(409, "x", "QUESTION_ANSWER_NOT_AVAILABLE", { reason: "not_a_question" })))
     .toBe("This question cannot be answered this way. Reload to see its current state.");
+});
+
+// Issue 611: the acceptance follow-ups of "Ask the lead".
+it("clears the take error when the lead unticks Take the proposed wording", async () => {
+  vi.spyOn(api, "actOnProblemReport").mockRejectedValue(new ApiError(409, "x", "QUESTION_ANSWER_NOT_AVAILABLE", { reason: "quote_not_found" }));
+  render(<AnswerQuestionDialog question={question()} onAnswered={vi.fn()} onClose={vi.fn()} />);
+  fireEvent.change(screen.getByRole("textbox", { name: /Your answer/ }), { target: { value: "Yes." } });
+  fireEvent.click(screen.getByRole("checkbox", { name: /Take the proposed wording/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Answer and take the wording" }));
+  await screen.findByText(/The quoted passage is no longer in the reviewer's text/);
+  fireEvent.click(screen.getByRole("checkbox", { name: /Take the proposed wording/ }));
+  expect(screen.queryByText(/The quoted passage is no longer in the reviewer's text/)).toBeNull();
+  expect(screen.getByRole("button", { name: "Send answer" })).toBeTruthy();
+});
+
+it("tells the lead 'task paused' only while the pause is in force, and the resume reason after it", async () => {
+  const paused = question({ report_id: "q1", reason: "Paused one?", pauses: true, assignment_id: 4, holds: [hold()] });
+  const resumed = question({ report_id: "q2", reason: "Resumed one?", pauses: true, assignment_id: 4, holds: [hold({ hold_id: "h2", active: false })],
+    events: [event({ action: "resume", reason: "I can do other paragraphs first" })] });
+  vi.spyOn(api, "listQuestions").mockResolvedValue([paused, resumed]);
+  render(<QuestionsPage projectKey="p" onNavigate={vi.fn()} />);
+  const first = (await screen.findByText("Paused one?")).closest("li")!;
+  const second = screen.getByText("Resumed one?").closest("li")!;
+  expect(first.textContent).toContain("· task paused");
+  expect(second.textContent).not.toContain("task paused");
+  expect(second.textContent).toContain("· resumed: I can do other paragraphs first");
+});
+
+it("drops the 'Question sent' notice once the lead has answered", async () => {
+  const asked = question({ report_id: "q9", viewer_is_lead: false });
+  vi.spyOn(api, "createProblemReport").mockResolvedValue(asked);
+  let list: ProblemReportView[] = [];
+  const state = (): TaskQuestions => ({ questions: list, reload: vi.fn(async () => undefined), put: vi.fn((value: ProblemReportView) => { list = [value]; }) } as unknown as TaskQuestions);
+  const props = { assignment: task, withProposal: false, readOnly: false, onDialogOpen: vi.fn() };
+  const { rerender } = render(<TaskQuestionList {...props} state={state()} dialogOpen={{ quote: "" }} />);
+  fireEvent.change(screen.getByRole("textbox", { name: /Your question/ }), { target: { value: "Is it meant?" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send question" }));
+  await waitFor(() => expect(list).toHaveLength(1));
+  rerender(<TaskQuestionList {...props} state={state()} dialogOpen={null} />);
+  expect(screen.getByText("Question sent. You can keep working.")).toBeTruthy();
+  list = [{ ...asked, state: "resolved", answer: "Yes.", answered_at: "2026-11-20T10:12:00Z" }];
+  rerender(<TaskQuestionList {...props} state={state()} dialogOpen={null} />);
+  expect(screen.queryByText("Question sent. You can keep working.")).toBeNull();
+});
+
+// Issue 616: after a clash the card does not say the wording is in the text.
+it("says the wording is not in the text when the reviewer's text was kept", () => {
+  const show = vi.fn();
+  const answered = question({ state: "resolved", answer: "Yes.", answered_at: "2026-11-20T10:12:00Z", took_proposed_text: true, viewer_is_lead: false });
+  render(<ul><QuestionItem question={answered} onShowInText={show} wordingInText={() => false} /></ul>);
+  expect(screen.queryByText("The lead put your wording into your text.")).toBeNull();
+  expect(screen.getByText(/It is not in your text now: you changed that passage/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Show it in my text" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Show the lead's wording" }));
+  expect(show).toHaveBeenCalled();
 });

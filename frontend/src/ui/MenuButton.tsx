@@ -87,9 +87,21 @@ export function MenuButton({ label, items, buttonLabel, icon, content, className
       resized?.observe(menu.current);
       changed?.observe(menu.current, { childList: true, subtree: true, characterData: true });
     }
+    // Placed again when the button itself moves, e.g. a neighbour's label grows once a summary loads (issue 605).
+    let frame = 0;
+    let at = "";
+    const follow = () => {
+      const rect = button.current?.getBoundingClientRect();
+      const now = rect ? `${rect.top} ${rect.bottom} ${rect.right}` : "";
+      if (at && now !== at) place();
+      at = now;
+      frame = requestAnimationFrame(follow);
+    };
+    if (typeof requestAnimationFrame === "function") follow();
     return () => {
       window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true);
       resized?.disconnect(); changed?.disconnect();
+      if (frame) cancelAnimationFrame(frame);
     };
   }, [open]);
   useLayoutEffect(() => {

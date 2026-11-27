@@ -1238,6 +1238,20 @@
     .details-rail-expand:hover { background: var(--surface-sunken); }
     .details-rail-expand:focus-visible { outline: var(--focus-width) solid var(--focus-ring); outline-offset: calc(-1 * var(--focus-width)); }
     .details-rail-strip-label { writing-mode: vertical-rl; font-size: var(--size-md); line-height: var(--leading-md); font-weight: var(--weight-strong); }
+    /* Issue 596: the selection, under the label, with an accent bar; a long name is cut (full in the title). */
+    .details-rail-strip-selection {
+      writing-mode: vertical-rl;
+      min-height: 0;
+      max-height: 50%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding-inline-end: 2px;
+      border-inline-end: 3px solid var(--accent);
+      font-size: var(--size-sm);
+      line-height: var(--leading-sm);
+      color: var(--text-muted);
+    }
   }
 }
 @media (forced-colors: active) { .details-rail-edge > .details-rail-collapse { border-color: CanvasText; } }
@@ -1261,6 +1275,14 @@
       height: 16px;
       margin: -8px 0 0;
       cursor: row-resize;
+    }
+    /* Issue 596: opened from a hit of the term search, the tree gives way so that the panel keeps 320 px, room for
+       the term, the mark, the search field and the first hit (they end about 292 px down at 1280 × 720), but never
+       below 290 px for the tree: its header, the "Only looking" note, three rows and "Use this term instead…" in full
+       (issue 652: at 220 px, 1280 × 600 showed 2.5 rows and cut the button). The panel takes that room only when its
+       content needs it. At 1440 × 900 nothing changes. */
+    .case-screen:not(.case-comparing) .app-layout.tree-open:not(.tree-sized):not(.panel-given-to-tree):has(> .inspector-pane .search-panel .candidate-list) {
+      grid-template-rows: minmax(40%, auto) minmax(min(max(50%, min(400px, 60%)), max(290px, 100% - 320px)), 1fr);
     }
     .case-screen:not(.case-comparing) .app-layout.tree-open.tree-sized {
       /* The limits of treeHeight.ts once more, so that a height from a higher window can push
@@ -2672,13 +2694,34 @@ details.case-version-controls > .btn { vertical-align: bottom; }
 
 /* Display-only reanchor context preserves the annotation's existing fill and selection. */
 .run--context { outline: 1px dotted var(--focus-ring); outline-offset: 1px; }
-.reanchor-context { white-space: pre-wrap; overflow-wrap: anywhere; }
+.reanchor-context { white-space: pre-wrap; overflow-wrap: break-word; }
 .problem-report-detail { width: min(100%, 72rem); margin-inline: auto; padding: var(--space-4); box-sizing: border-box; }
 .problem-report-detail form, .report-history { margin-block: var(--space-4); }
 .problem-report-detail fieldset { min-width: 0; }
 .report-history dd { margin-inline-start: 0; }
 .reanchor-panel ol { padding-left: var(--space-4); }
-.reanchor-panel .translation-diff { max-height: 16rem; min-height: 0; }
+/* An item that needs review after a text change (#633): a dashed frame where its words are now or where they were.
+   Its line form is its own (findings use fills and bottom borders); alone it has no fill, over a finding it keeps it. */
+.run--pending { outline: 1.5px dashed var(--warning); outline-offset: 1px; }
+.run--ghost { background-image: none; }
+.run--pending.run--framed { outline-style: solid; }
+/* Compact rows: term, the old words and the actions; the text change on demand. */
+.reanchor-row { padding-block: var(--space-1); border-radius: var(--radius-sm); }
+.reanchor-row[data-selected] { box-shadow: inset 3px 0 0 var(--warning); padding-left: var(--space-2); }
+.reanchor-row__head, .reanchor-row__values { margin: 0; overflow-wrap: anywhere; }
+.reanchor-row__values { color: var(--text-muted); font-size: var(--size-sm); }
+.reanchor-row__now { color: var(--text-muted); }
+.reanchor-row__term.btn { padding-inline: 0; font-weight: 600; }
+.reanchor-row__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-block: var(--space-1); }
+.reanchor-row__more > summary { cursor: pointer; font-size: var(--size-sm); }
+/* Issue 652: the diff reads like the contexts above it (the row's 14 px, not the reading text's 18 px) and breaks
+   lines between words, also where a deleted word meets the inserted one. */
+.reanchor-panel .translation-diff {
+  height: auto; max-height: 16rem; min-height: 0; padding: var(--space-2);
+  font-family: inherit; font-size: var(--size-md); line-height: var(--leading-md); overflow-wrap: break-word;
+}
+.reanchor-panel .translation-diff del + ins::before, .reanchor-panel .translation-diff ins + del::before { content: "\200B"; }
+.reanchor-row__next.btn { padding-inline: var(--space-1); font-variant-numeric: tabular-nums; }
 
 .reanchor-context mark { background: var(--warning-light); color: inherit; }
 .reanchor-context mark[data-old-kind~="cue"] { text-decoration: underline dotted; }
@@ -2902,6 +2945,24 @@ details.case-version-controls > .btn { vertical-align: bottom; }
 .values-section .axis-option.is-default:has(input:checked:focus-visible) {
   background: var(--warning-light);
   color: var(--warning);
+}
+/* Issue 612: a read-only task (submitted, paused, a reference) shows its values as values, not as choices: no
+   accent fill, a quiet frame; the chosen value stays in full contrast on a grey fill, the others are muted. */
+.values-section .axis-options.is-readonly {
+  border-color: var(--border);
+}
+.values-section .axis-options.is-readonly .axis-option {
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.values-section .axis-options.is-readonly .axis-option + .axis-option {
+  border-left-color: var(--border);
+}
+.values-section .axis-options.is-readonly .axis-option:has(input:checked):not(.is-default):not(.is-unset) {
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-weight: var(--weight-strong);
 }
 /* The group has no overflow clipping, so the raised focused segment shows its whole ring. */
 .values-section .axis-option:has(input:focus-visible) {
@@ -3406,6 +3467,8 @@ details.case-version-controls > .btn { vertical-align: bottom; }
 /* A touch screen without a keyboard: no key hints on the editor's buttons (issue 468). */
 @media (hover: none) and (pointer: coarse) {
   .case-screen .btn kbd.kbd { display: none; }
+  /* Tapping a hit adds it; the active hit shows no Enter key (issue 612). */
+  .candidate-enter { display: none; }
 }
 
 /* Issue 539: from 1025 px the case toolbar shares the app header's bar while a case is open (AppShell keeps a place
@@ -3461,9 +3524,13 @@ details.case-version-controls > .btn { vertical-align: bottom; }
     font-size: var(--size-reading); line-height: var(--leading-base);
     flex: 1 1 7em; width: 7em; min-width: 7em; max-width: max-content;
   }
+  /* Issue 596: a mode that does not fit on one line takes a second (the bar has room for two of its small lines)
+     instead of an ellipsis; it never gets narrower than about half its text (--mode-half, set in CaseScreen), so the
+     bar's minimum (#627) keeps both lines whole and a window too narrow for that wraps the case controls instead. */
   .case-toolbar--merged .case-mode {
-    flex: 1000 1 4em; width: 4em; min-width: 0; max-width: max-content;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1000 1 var(--mode-half, 4em); width: var(--mode-half, 4em); min-width: min(var(--mode-half, 4em), max-content); max-width: max-content;
+    overflow: hidden; white-space: normal; line-height: 1rem;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
   }
   .case-toolbar--merged .app-title--single-case .case-navigation { display: none; }
 }

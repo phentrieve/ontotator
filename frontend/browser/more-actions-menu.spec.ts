@@ -104,3 +104,34 @@ for (const [width, height] of SIZES) {
     expect(errors).toEqual([]);
   });
 }
+
+// Issue 605: on the phone the bar's buttons sit left-aligned, so "More actions" moves right when the primary button
+// turns from "Assign…" into "Assign annotation…" once the summary loads. The open menu follows its button.
+test("More actions follows its button when the summary arrives after the menu opened (390×844, issue 605)", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const s = await documentsScenario(page, "S464");
+  await loginExisting(page, s.users.lead);
+  await page.goto(`/#/projects/${encodeURIComponent(s.project)}/documents`);
+  await documentsReady(page);
+  let release = (): void => undefined;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/document-rows/selection-summary", async route => { await held; await route.continue(); });
+  // EN100027: nobody works on it; EN100022: one of two annotators. The summary offers "Assign annotation…".
+  await selectTexts(page, ["EN100027", "EN100022"]);
+  const primary = selectionBar(page).getByRole("button", { name: /^Assign/ });
+  await expect(primary).toHaveText("Assign…");
+  await moreActions(page).click();
+  await expect(menuOf(page)).toBeVisible();
+  const edges = () => page.evaluate(() => ({
+    menu: document.querySelector<HTMLElement>('[role="menu"][aria-label="More actions"]')!.getBoundingClientRect().right,
+    button: document.querySelector<HTMLElement>('[aria-label="Selection"] button[aria-label="More actions"]')!.getBoundingClientRect().right,
+  }));
+  const before = await edges();
+  expect(Math.abs(before.menu - before.button)).toBeLessThan(1);
+  release();
+  await expect(primary).not.toHaveText("Assign…");
+  await expect(menuOf(page)).toBeVisible();
+  // The button has moved; the menu's right edge is at the button's right edge again.
+  await expect.poll(async () => (await edges()).button).not.toBe(before.button);
+  await expect.poll(async () => { const now = await edges(); return Math.abs(now.menu - now.button) < 1; }).toBe(true);
+});

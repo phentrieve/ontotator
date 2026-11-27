@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type TreeOpenResponse, type TreeTermDetail } from "../src/api/client";
 import { TreeBrowser, type TreeBrowserProps } from "../src/editor/TreeBrowser";
+import { TermIdsProvider } from "../src/editor/termIds";
 
 const key = {
   project_key: "pkg",
@@ -317,6 +318,23 @@ describe("TreeBrowser: one walk", () => {
     // Read with the region's name when the focus enters it.
     expect(screen.getByRole("region", { name: "Ontology tree" }).getAttribute("aria-describedby")).toBe(note.id);
     expect(props.onUseTerm).not.toHaveBeenCalled();
+  });
+
+  it("names the code in the confirmation as the project shows codes, without the prefix when it is hidden (#634)", async () => {
+    vi.spyOn(api, "openTree").mockResolvedValue(seizureWalk());
+    vi.spyOn(api, "loadTreeNode").mockResolvedValue({
+      detail: detail("HP:2133", "Status epilepticus"),
+      children: [],
+      path: [],
+      levels: [],
+    });
+    const props = { ...baseProps(), mode: "new" as const };
+    const { container } = render(<TermIdsProvider ontologyIds={["hp"]}><TreeBrowser {...props} /></TermIdsProvider>);
+    await loaded();
+    fireEvent.click(item("Status epilepticus"));
+    await detailPane(container).findByText("Status epilepticus", { selector: ".tree-detail__name" });
+    fireEvent.click(screen.getByRole("button", { name: "Use this term instead…" }));
+    expect(screen.getByRole("group", { name: "New finding: choose Status epilepticus (2133)" })).toBeDefined();
   });
 
   it.each([

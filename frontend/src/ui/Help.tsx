@@ -47,9 +47,16 @@ export function HelpButton({ help, topic }: HelpButtonProps): JSX.Element {
     aria-controls={help.id} onClick={help.toggle} onKeyDown={closeOnEscape(help)}><span aria-hidden="true">?</span></button>;
 }
 
-/** The explanation of a (?) button: hidden until the button opens it. */
+/**
+ * The explanation of a (?) button: hidden until the button opens it. Opened near the edge of a scrolling box (a
+ * dialog's body), the box scrolls just enough to show it (issue 621); the button stays where it is when it fits.
+ */
 export function HelpText({ help, children }: { help: HelpState; children: ReactNode }): JSX.Element {
-  return <div id={help.id} className="ui-help-text" hidden={!help.open} onKeyDown={closeOnEscape(help)}>{children}</div>;
+  const text = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (help.open) text.current?.scrollIntoView?.({ block: "nearest" });
+  }, [help.open]);
+  return <div ref={text} id={help.id} className="ui-help-text" hidden={!help.open} onKeyDown={closeOnEscape(help)}>{children}</div>;
 }
 
 const CLIPS = /auto|scroll|hidden|clip/;

@@ -33,7 +33,8 @@ export interface AttachModePanelProps {
 
 /** Copy of the attach mode in one place (spec "Attach mode" 4, 7–9). */
 export const attachCopy = {
-  banner: (term: string) => `Attach ${term}: click its finding in the list or in the text (↑ ↓ Enter in the list). Esc cancels.`,
+  banner: (term: string, touch = false) => touch ? `Attach ${term}: tap its finding in the list or in the text.`
+    : `Attach ${term}: click its finding in the list or in the text (↑ ↓ Enter in the list). Esc cancels.`,
   noNearest: "No finding in this sentence. Choose one in the findings list or in the text.",
   noFindings: (term: string) => `${term} is a modifier. Create the finding first, then add ${term} under Modifiers.`,
   useAsFinding: (term: string) => `Use ${term} as the finding`,

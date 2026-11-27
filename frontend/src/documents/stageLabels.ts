@@ -45,7 +45,8 @@ export const FINAL_CAUSE_TEXT: Readonly<Record<string, string>> = {
   SELECTED_ROUND_SUPERSEDED: "round replaced",
 };
 
-const BLOCKED_TEXT: Readonly<Record<string, string>> = {
+/** Why annotation is blocked; the table, the text card and the phone card name it alike (issue 613). */
+export const BLOCKED_TEXT: Readonly<Record<string, string>> = {
   translation_rejected: "translation rejected",
   translation_queried: "queried",
   translation_not_accepted: "not accepted",
@@ -93,6 +94,7 @@ const NARROW_STATES: readonly (readonly [RegExp, string])[] = [
   // "· max 2" (an open task below the limit) stays in the title; the narrow cell names the work.
   [/^assigned, not started(?: · max \d+)?$/, "not started"],
   [/^(?:after translation review|waiting for review \(.*\))$/, "after review"],
+  [/^blocked, .+$/, "blocked"],
   [/^in review, .+$/, "in review"],
   [/^(\d+) of (\d+) submitted(?:, .+)?(?: · max \d+)?$/, "$1/$2 submitted"],
   [/^(\d+) annotators? · max (\d+)$/, "$1 · max $2"],
@@ -230,7 +232,9 @@ function annotationText(cell: StageCellView): StageText {
       // Below the limit (the server sends `target` then): "max 2" after the open work.
       const max = detail.target != null && (detail.assigned ?? 0) < detail.target ? `max ${detail.target}` : null;
       if (detail.total != null && detail.submitted != null) {
-        return { symbol: "◐", word: submittedOf(detail.submitted, detail.total), detail: join(people && `waiting: ${people}`, startedPart(detail), max, waiting) };
+        // Issue 606: nothing submitted and no task started yet is "○", as with one annotator; ◐ once work runs.
+        const idle = detail.submitted <= 0 && startedOf(detail) === "none";
+        return { symbol: idle ? "○" : "◐", word: submittedOf(detail.submitted, detail.total), detail: join(people && `waiting: ${people}`, startedPart(detail), max, waiting) };
       }
       const change = detail.note === "may_change" ? join(version(detail.version), "may change") : null;
       const started = startedOf(detail);

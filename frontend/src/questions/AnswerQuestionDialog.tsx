@@ -35,7 +35,7 @@ export function AnswerQuestionDialog({ question, onAnswered, onClose }: {
     } finally { if (active.current) setBusy(false); }
   };
 
-  return <Dialog open title={`Answer ${reporterName(question)}`} size="md" initialFocus={textarea} onClose={busy ? undefined : onClose} footer={<>
+  return <Dialog open title={`Answer ${reporterName(question)}`} size="md" className="ask-lead-dialog" initialFocus={textarea} onClose={busy ? undefined : onClose} footer={<>
     <Button variant="primary" loading={busy} onClick={() => { void send(); }}>{answerButton(proposal && take)}</Button>
     <Button aria-disabled={busy || undefined} onClick={() => { if (!busy) onClose(); }}>Cancel</Button>
   </>}>
@@ -52,7 +52,7 @@ export function AnswerQuestionDialog({ question, onAnswered, onClose }: {
       <Textarea ref={textarea} id={`${id}-answer`} label={ANSWER_FIELD} rows={4} required value={answer} readOnly={busy} hint={ANSWER_HINT}
         error={fieldError} onChange={event => { setAnswer(event.target.value); if (fieldError) setFieldError(null); }} />
       {proposal && <Checkbox id={`${id}-take`} label={TAKE_PROPOSED_LABEL} hint={TAKE_PROPOSED_HINT} checked={take} disabled={busy}
-        onChange={event => setTake(event.target.checked)} />}
+        onChange={event => { setTake(event.target.checked); setError(null); }} />}
       {error != null && <ErrorNotice error={error} />}
     </div>
   </Dialog>;

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { NextStepView } from "../../src/api/client";
-import { actionLabel, leadSteps, rowActionLabel, stepLabel, STEP_LABELS } from "../../src/documents/nextStepLabels";
+import { actionLabel, leadSteps, rowActionLabel, rowStepLabel, stepLabel, STEP_LABELS } from "../../src/documents/nextStepLabels";
 import { row, stageCell, stages, stepOf, version, work } from "./fixtures";
 
 describe("next step labels", () => {
@@ -87,6 +87,10 @@ describe("next step labels", () => {
       work: [work({ assignment_id: 1, document_id: "d1", person: tom }), work({ assignment_id: 3, document_id: "d1", status: "submitted", person: luc })] });
     expect(rowActionLabel(handleTom, one)).toBe("Handle text change…");
     expect(rowActionLabel(carry, one)).toBe("Carry to v3…");
+    // Issue 628: the step's name follows the target version as well; without a known target it keeps "Carry to v2".
+    expect(rowStepLabel(carry, one)).toBe("Carry to v3");
+    expect(rowStepLabel(carry, { versions: [] })).toBe("Carry to v2");
+    expect(rowStepLabel(handleTom, one)).toBe("Handle text change");
     const several = { ...one, steps: [handleTom, handleLuc], work: [...one.work, work({ assignment_id: 2, document_id: "d1", person: luc })] };
     expect(rowActionLabel(handleTom, several)).toBe("Handle text change…, Tom Reis");
     expect(rowActionLabel(handleLuc, several)).toBe("Handle text change…, Luc Martin");

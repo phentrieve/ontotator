@@ -23,6 +23,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Query, Request
 from ontospan import AnnotatedDocument
 from pg_harness import database_url_for
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from ontotator.api.app import create_app
@@ -84,6 +85,13 @@ PORT = int(os.environ.get("HPO_E2E_PORT", "18765"))
 BROWSER_KEEP_ALIVE_SECONDS = 600
 # The password of every user that ``/__test_user__`` sets up (frontend/browser/helpers.ts).
 TEST_PASSWORD = "browser test passphrase"
+
+
+class ReviewScenarioTexts(BaseModel):
+    """Source and translation of a translation review scenario, set by the spec."""
+
+    source: str
+    target: str
 
 
 def fixture_package(
@@ -933,6 +941,7 @@ def register_translation_review_scenario_route(app: FastAPI) -> None:
         single: bool = False,
         waiting_proposal_task: bool = False,
         reviewer_annotates: bool = False,
+        texts: ReviewScenarioTexts | None = None,
     ) -> dict[str, object]:
         from t1_builders import bundle as variant_bundle
         from t1_builders import correction_unit, native_unit, translation_unit
@@ -971,6 +980,9 @@ def register_translation_review_scenario_route(app: FastAPI) -> None:
                     paragraphs[3][900:],
                 ]
             )
+        if texts is not None:
+            # Texts of the spec's own (segment pairs, issue 560).
+            source_text, target_text = texts.source, texts.target
         if workflow:
             source_text = "Hypotonia. " + source_text
         source = native_unit(external_id, "en", source_text, case_id=case_id)
@@ -1218,7 +1230,9 @@ def register_reanchor_scenario_route(app: FastAPI) -> None:
     """Fresh real import/reanchor results; never registered in the shipped app."""
 
     @app.post("/__test_reanchor__")
-    def reanchor_scenario(assisted: bool = False) -> dict[str, object]:
+    def reanchor_scenario(
+        assisted: bool = False, reordered: bool = False
+    ) -> dict[str, object]:
         from t1_builders import bundle as variant_bundle
         from t1_builders import correction_unit, native_unit
         from t1_fixtures import PIN, annotation, hpo_profile
@@ -1289,6 +1303,52 @@ def register_reanchor_scenario_route(app: FastAPI) -> None:
         corrected = correction_unit(
             source, old_text.replace("Seizure 😀old", "Ataxia 😀new")
         )
+        if reordered:
+            # The example of #633: one finding reworded, one sentence reordered,
+            # two proposals on the same unchanged word. The fixture ontology has
+            # few terms, so the terms stand in for Ptosis, Ataxia and Gait
+            # disturbance; only the words matter here.
+            old_text = (
+                "History: two febrile seizures in infancy. Examination showed"
+                " hypotonia and mild ptosis.\n\nPhysiotherapy was started after"
+                " ataxia was noted. Ataxia improved within weeks.\nFamily history"
+                " is unremarkable."
+            )
+            new_text = old_text.replace(
+                "mild ptosis", "a slightly drooping eyelid"
+            ).replace(
+                "Physiotherapy was started after ataxia was noted.",
+                "After ataxia was noted, physiotherapy was started.",
+            )
+
+            def on(word: str) -> tuple[int, int]:
+                at = old_text.index(word)
+                return at, at + len(word)
+
+            source = native_unit(
+                external,
+                "en",
+                old_text,
+                case_id="Pending case /1 %é",
+                annotations=[
+                    annotation(
+                        "hypotonia",
+                        on("hypotonia"),
+                        text=old_text,
+                        term_id="HP:0001252",
+                    ),
+                    annotation(
+                        "ptosis", on("ptosis"), text=old_text, term_id="HP:0000365"
+                    ),
+                    annotation(
+                        "ataxia", on("ataxia"), text=old_text, term_id="HP:0001284"
+                    ),
+                    annotation(
+                        "gait", on("ataxia"), text=old_text, term_id="HP:0001250"
+                    ),
+                ],
+            )
+            corrected = correction_unit(source, new_text)
         with tempfile.TemporaryDirectory() as folder:
             imported = run_fixture_import(
                 app, variant_bundle(Path(folder), [source, corrected]), key

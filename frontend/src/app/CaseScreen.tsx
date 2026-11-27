@@ -1,5 +1,5 @@
-import { ReanchorPanel, currentReanchorResolution, reanchorKey, reanchorRef, useReanchorContext } from "../variants/ReanchorPanel";
-import { useCarriedReview } from "../editor/carried/useCarriedReview";
+import { ReanchorPanel, currentReanchorResolution, oldWords, parseReanchorMark, reanchorKey, reanchorMarks, reanchorRef, suggestionsOf, useReanchorContext } from "../variants/ReanchorPanel";
+import { recreatedAnnotationId, useCarriedReview } from "../editor/carried/useCarriedReview";
 import { carriedChosenAxisIds, carriedListOrder as orderCarriedFirst, carriedNote, deriveCarriedStates, nextUncheckedKey, rowKeyOf, type CarriedState, type SnapshotLike } from "../editor/carried/checkState";
 import { canRestore, captureDeletedFinding, modifierRestoreCommands, restoreCommands, type DeletedFinding } from "../editor/restoreFinding";
 import { carriedOriginLine, TEXT_CHANGE_ORIGIN, instructionLine, missingReason, roundName, textSpanLine, valuesLines, whatToCheckContext, type WhatToCheckContext } from "../editor/carried/instructions";
@@ -95,7 +95,7 @@ import { useSearchLanguages } from "../editor/searchLanguages";
 import { SearchPanel } from "../editor/SearchPanel";
 import { isUntouchedPrefill, passageText, prefillHint, prefillQuery } from "../editor/termSearch";
 import { focusTextAt } from "../editor/textFocus";
-import { useMediaQuery } from "../ui/useMediaQuery";
+import { useMediaQuery, useTouchOnly } from "../ui/useMediaQuery";
 import { ShellCaseBarSlot } from "../ui/AppShell";
 import { DismissibleHint, showHintsAgain, useHintsRead } from "../editor/DismissibleHint";
 import { SearchManager } from "../editor/searchState";
@@ -353,6 +353,9 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
   // "Mark in text" waits for a text selection for this carried input.
   const [activeCarried, setActiveCarried] = useState<import("../api/client").RoundInputView | null>(null);
   const [resolutionItem, setResolutionItem] = useState<ReanchorItem | null>(null);
+  /** The pending text-change item selected in its panel or by its mark in the text (issue 633), and the suggested place in use per item. */
+  const [selectedReanchorKey, setSelectedReanchorKey] = useState<string | null>(null);
+  const [reanchorPlaces, setReanchorPlaces] = useState<Record<string, number>>({});
   const [spanlessReason, setSpanlessReason] = useState("");
   const [pendingEvidenceAdoption, setPendingEvidenceAdoption] = useState<TargetProposal | null>(null);
   const [pendingAdoption, setPendingAdoption] = useState<TargetProposal | null>(null);
@@ -537,6 +540,8 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
   const rootRef = useRef<HTMLDivElement>(null);
   // At ≤700 px the editor shows one pane at a time; marking text does not switch panes on its own.
   const panesLayout = useMediaQuery("(max-width: 700px)");
+  // A touch screen: the marking banners leave out keys (issue 612); the banner's Cancel ends the mode.
+  const touchOnly = useTouchOnly();
   // Below 1024 px the header keeps one bar: "Next open item" moves into "More", the mode text hides.
   const narrowHeader = useMediaQuery("(max-width: 1023px)");
   // Issue 539: from 1025 px the case toolbar joins the app header in one bar (the header keeps a place for it).
@@ -1157,10 +1162,123 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
         setActionError("Select the replacement finding in the findings list, then choose Complete text-change review.");return;
       }
       setLayerSelection(previous => setActiveLayer(previous,view.layers ?? [],view.scope,item.layer_id));
-      setActiveReanchor(item);setSelectionIntent("new_mention");setMobilePane("text");
-      reanchorContext.reveal(item.new_context);
+      setActiveReanchor(item);setSelectionIntent("new_mention");setMobilePane("text");setSelectedReanchorKey(reanchorKey(item));
+      // Without a reliable location the text only scrolls there: nothing is highlighted as if it were the place (issue 633).
+      reanchorContext.reveal(item.new_context, { highlight: reanchorMarks(item).length > 0 });
       leftTextElement?.focus();
     } catch(error) {reportError(error);}
+  };
+
+  /** The next unresolved text-change item after `fromKey` in panel order (wrapping), by the latest draft. */
+  const nextPendingReanchor = (fromKey: string | null, direction: 1 | -1 = 1): ReanchorItem | undefined => {
+    const current = latestDraft.current, all = pendingReanchorItems;
+    const open = (item: ReanchorItem) => !currentReanchorResolution(item, current.reanchor_resolutions ?? [], current.annotations ?? []);
+    const index = fromKey === null ? -1 : all.findIndex(item => reanchorKey(item) === fromKey);
+    for (let step = 1; step <= all.length; step++) {
+      const candidate = all[(((index === -1 && direction === -1 ? 0 : index) + direction * step) % all.length + all.length) % all.length];
+      if (open(candidate)) return candidate;
+    }
+    return undefined;
+  };
+  /**
+   * Selects a text-change item: its row in the panel and its mark in the text (the suggested place `place`, else
+   * the place in use). The text scrolls to the place and shows its context for a moment; without a reliable
+   * location it only scrolls there. `focusRow` focuses the row's first action and keeps the panel in view;
+   * `fromText` (a press on its mark) leaves the text where it is.
+   */
+  const selectReanchor = (item: ReanchorItem, { place, focusRow = false, fromText = false }: { place?: number; focusRow?: boolean; fromText?: boolean } = {}) => {
+    const key = reanchorKey(item), at = place ?? reanchorPlaces[key] ?? 0;
+    if (place !== undefined) setReanchorPlaces(previous => ({ ...previous, [key]: place }));
+    setSelectedReanchorKey(key);
+    const marks = reanchorMarks(item), mark = marks.find(value => value.place === at) ?? marks[0];
+    // The context is anchored at the first suggested place (or the new wording); another place is scrolled to by its mark.
+    if (!fromText) {
+      if (mark && mark.place !== null && mark.place > 0) setTextScrollRequest(previous => ({ evidenceId: mark.id, nonce: (previous?.nonce ?? 0) + 1, ifNeeded: true }));
+      else reanchorContext.reveal(item.new_context, { highlight: !!mark });
+    }
+    if (!focusRow) return;
+    setMobilePane("list");
+    requestAnimationFrame(() => { if (!focusReanchorRow(key)) reanchorFocusAfterSave.current = key; });
+  };
+  /**
+   * Focuses the row's first action and keeps it in view; false while its buttons are still disabled (the queue
+   * saves the step that resolved the previous item), so the focus follows once the save is done.
+   */
+  const focusReanchorRow = (key: string): boolean => {
+    const row = [...(sidebarScrollRef.current?.querySelectorAll<HTMLElement>('[data-reanchor-item]') ?? [])]
+      .find(element => element.dataset.reanchorItem === key);
+    for (let disclosure = row?.parentElement?.closest("details"); disclosure; disclosure = disclosure.parentElement?.closest("details")) disclosure.open = true;
+    row?.scrollIntoView?.({ block: "nearest" });
+    const target = row?.querySelector<HTMLElement>('[data-reanchor-primary]:not([aria-disabled="true"])') ?? row?.querySelector<HTMLElement>('button');
+    target?.focus({ preventScroll: true });
+    return !target || document.activeElement === target;
+  };
+  const reanchorFocusAfterSave = useRef<string | null>(null);
+  // The render that enables the buttons again (the save is done) hands the waiting focus on; a selection changed meanwhile drops it.
+  useEffect(() => {
+    const key = reanchorFocusAfterSave.current;
+    if (!key || queueState === "saving") return;
+    reanchorFocusAfterSave.current = null;
+    if (selectedReanchorKey === key) focusReanchorRow(key);
+  });
+  /** After an item is resolved: the next pending one is selected, in the panel and in the text; else the panel's count gets the focus. */
+  const afterReanchorResolved = (item: ReanchorItem) => {
+    const next = nextPendingReanchor(reanchorKey(item));
+    if (next) { selectReanchor(next, { focusRow: true }); return; }
+    setSelectedReanchorKey(null);
+    requestAnimationFrame(() => sidebarScrollRef.current?.querySelector<HTMLElement>('[data-reanchor-status]')?.focus({ preventScroll: true }));
+  };
+  /**
+   * Values the annotator still has to check before the review of a re-created finding is complete: defaulted values
+   * in a project that requires chosen ones. Otherwise defaulted values stay open items, as on any finding.
+   */
+  const valuesToCheck = (item: ReanchorItem) => !!view.require_chosen_axes && (item.axes_defaulted?.length ?? 0) > 0;
+  /**
+   * "Use this location": re-creates the finding at a suggested place with its term and values, and completes its
+   * text-change review in the same step. With values still to check the finding opens instead, to confirm them first.
+   */
+  const applyReanchorLocation = (item: ReanchorItem, place: number) => void inStep(async () => {
+    if (creatingPending.current) return;
+    try {
+      assertWritable();
+      await flushAnnotationNotes();
+      if (unsavedAnnotationNotes().length) { setActionError("Save the annotation note before re-creating another finding."); return; }
+      const segments = suggestionsOf(item)[place], typeId = item.type_id;
+      const layer = view.layers?.find(value => value.layer_id === item.layer_id);
+      if (!segments) return;
+      if (!typeId || !layer?.annotation_types.some(type => type.type_id === typeId) || !view.scope.editable_layer_ids.includes(item.layer_id)) {
+        setActionError("The original finding type is unavailable for re-creation. You can still dismiss this finding with a reason.");return;
+      }
+      creatingPending.current = true;
+      cancelPending();
+      setLayerSelection(previous => setActiveLayer(previous, view.layers ?? [], view.scope, item.layer_id));
+      setSelectedReanchorKey(reanchorKey(item));
+      const annotationId = `ann-${crypto.randomUUID()}`, evidenceId = newEvidenceId();
+      const term = termLabel(item.layer_id, item.term_id) || item.term_id;
+      await enqueueMutation({ command: "recreate_reanchor", item: reanchorRef(item), annotation_id: annotationId, evidence_id: evidenceId,
+        layer_id: item.layer_id, type_id: typeId, term_id: item.term_id, axes_values: item.axes_values ?? {},
+        segments: segments.map(({ start, end }) => ({ start, end })) });
+      if (valuesToCheck(item)) {
+        setResolutionItem(item);
+        setSelectedTargetId(null); setSelectedSourceId(null);
+        setSelectedAnnotationId(annotationId); setSelectedEvidenceId(evidenceId); setMobilePane("details");
+        announceCarried(`${term} re-created on “${oldWords(item)}”. Confirm its values, then complete the text-change review.`);
+        requestAnimationFrame(() => (inspectorRef.current?.querySelector<HTMLElement>('[data-confirm-defaults]')
+          ?? inspectorRef.current?.querySelector<HTMLElement>('button, input, textarea, select'))?.focus({ preventScroll: true }));
+        return;
+      }
+      await resolveReanchor(item, "recreated", annotationId);
+      announceCarried(`${term} re-created on “${oldWords(item)}”.`);
+      afterReanchorResolved(item);
+    } catch (error) { reportError(error); }
+    finally { creatingPending.current = false; }
+  });
+  /** The values of an item that differ from the defaults of its type, as one line; null when none do. */
+  const reanchorValues = (item: ReanchorItem): string | null => {
+    const defaults: Record<string, string | null | undefined> = (item.type_id ? view.creation_defaults?.[item.layer_id]?.[item.type_id] : undefined) ?? {};
+    const shown = Object.entries(item.axes_values ?? {}).filter(([axis, value]) => value !== null && value !== undefined
+      && !(item.axes_defaulted ?? []).includes(axis) && value !== defaults[axis]);
+    return shown.length ? shown.map(([axis, value]) => `${axis}: ${value}`).join(", ") : null;
   };
 
   /** Selects a proposal and its first mark, as a click on its list row does. */
@@ -1488,7 +1606,7 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
       : state.missing === "deleted" ? "placeholder:deleted" as const : "placeholder:mapping_failed" as const);
     return instructionLine(carriedContext(state.input).context, state.variant, where);
   };
-  /** The finding re-created via "Mark in text" for a placeholder input, while it exists (client-side link). */
+  /** The finding re-created via "Mark in text" for a placeholder input, while it exists (linked by its ID, issue 652). */
   const recreatedFinding = (state: CarriedState) => {
     const id = state.homeId ? undefined : carried.recreatedFor[state.input.input_id];
     return id ? draft.annotations?.find(snapshot => snapshot.annotation.annotation_id === id) : undefined;
@@ -1960,7 +2078,8 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
     if (activeCarried) {
       const input = activeCarried, source = input.source_snapshot.annotation;
       handleDeselectAll();
-      setPendingAnnotation({ annotationId: `ann-${crypto.randomUUID()}`, evidenceId: newEvidenceId(), layerId: source.layer_id,
+      // The ID names the input: the link to it is saved with the finding and survives a reload (issue 652).
+      setPendingAnnotation({ annotationId: recreatedAnnotationId(input.input_id), evidenceId: newEvidenceId(), layerId: source.layer_id,
         typeId: source.type_id, segments: payload.segments, carriedInput: input });
       return;
     }
@@ -2138,10 +2257,12 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
         catch { notCopied.push(termLabel(pending.layerId, modifier.term_id) ?? modifier.term_id); }
       }
       if (notCopied.length) announceCarried(`Could not copy modifier ${notCopied.join(", ")}.`);
-      if (pending.reanchorItem) setResolutionItem(pending.reanchorItem);
-      // Linked client-side as the input's result; the input stays "Check needed" (no auto-complete).
+      // A re-created finding whose values need no check completes its text-change review in the same step (issue 633).
+      const completed = pending.reanchorItem && !valuesToCheck(pending.reanchorItem) ? pending.reanchorItem : null;
+      if (completed) await resolveReanchor(completed, "recreated", pending.annotationId);
+      else if (pending.reanchorItem) setResolutionItem(pending.reanchorItem);
+      // Linked as the input's result by its ID; the input stays "Check needed" (no auto-complete).
       if (pending.carriedInput) {
-        carried.rememberRecreated(pending.carriedInput.input_id, pending.annotationId);
         setFocusRequest({ key: `annotation:${pending.annotationId}`, find: carriedPrimary });
       }
       setPendingAnnotation(null);
@@ -2149,9 +2270,15 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
       setSpanlessReason(""); setSpanlessReasonError(false);
       setSelectedTargetId(null);
       setSelectedSourceId(null);
-      setSelectedAnnotationId(pending.annotationId);
-      setSelectedEvidenceId(pending.evidenceId ?? null);
+      setSelectedAnnotationId(completed ? null : pending.annotationId);
+      setSelectedEvidenceId(completed ? null : pending.evidenceId ?? null);
       searchManager.clear();
+      if (completed) {
+        setActiveReanchor(null);
+        announceCarried(`${termLabel(completed.layer_id, termId) || termId} re-created.`);
+        afterReanchorResolved(completed);
+        return;
+      }
       // A newly marked span continues the loop: values next, then back to the text (spec B.2).
       if (!pending.isSpanless && !pending.reanchorItem && !pending.carriedInput) {
         setLoopFocus({ annotationId: pending.annotationId, termText: termText ?? null });
@@ -2167,6 +2294,12 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
 
   const handlePickMention = (evidenceId: string) => {
     if (evidenceId === pendingAnnotation?.evidenceId) return;
+    const reanchorMark = parseReanchorMark(evidenceId);
+    if (reanchorMark) {
+      const item = pendingReanchorItems.find(value => reanchorKey(value) === reanchorMark.key);
+      if (item) selectReanchor(item, { place: reanchorMark.place ?? undefined, focusRow: true, fromText: true });
+      return;
+    }
     const pickedModifier = parseModifierDisplayId(evidenceId);
     if (attachActive) {
       // A finding's mark is a target of the attach mode: a click attaches instead of selecting.
@@ -3275,26 +3408,32 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
       .map(mark => ({ ...mark, evidence_id: `target:${t.annotation_id}:${t.version}:${mark.evidence_id}` }));
   });
   const attachFramed = attachFocusId ?? attachNearest?.annotationId ?? null;
-  const framedIds = attachActive ? (attachFramed ? framingIds(attachFramed, true) : [])
+  // The selected text-change item frames its mark at the place in use, when nothing else is framed.
+  const selectedReanchorEntry = selectedReanchorKey ? pendingReanchorItems.find(item => reanchorKey(item) === selectedReanchorKey) : undefined;
+  const reanchorFramed = selectedReanchorEntry && !attachActive ? reanchorMarks(selectedReanchorEntry)
+    .filter(mark => mark.place === null || mark.place === (reanchorPlaces[selectedReanchorKey!] ?? 0)).map(mark => mark.id) : [];
+  const otherFramed = attachActive ? (attachFramed ? framingIds(attachFramed, true) : [])
     : hoverFrameId ? framingIds(hoverFrameId, true)
       : selectedAnnotationId ? framingIds(selectedAnnotationId, false)
         : selectedTarget ? proposalModifierMarks.map(mark => mark.evidence_id)
           .filter(id => id.startsWith(`target:${selectedTarget.annotation_id}:${selectedTarget.version}:`)) : [];
+  const framedIds = otherFramed.length || selectedAnnotationId || selectedTargetId || selectedSourceId ? otherFramed : reanchorFramed;
   const handleHoverMentions = (ids: string[]) => {
     const owner = ids.map(id => parseModifierDisplayId(id)?.annotationId ?? ownerOfEvidence(id)?.annotation.annotation_id).find(Boolean);
     setHoverFrameId(owner ?? null);
   };
 
   // One line above the text, only while a marking mode waits for text (spec C.6).
+  const escCancels = touchOnly ? "" : " Esc cancels.";
   const intentTerm = selectedAnnotation
     ? termLabel(selectedAnnotation.annotation.layer_id, selectedAnnotation.annotation.term_id) || selectedAnnotation.annotation.term_id
     : null;
   const extendedMention = selectedAnnotation && selectedEvidenceId
     ? (selectedAnnotation.annotation.evidence_refs ?? []).findIndex(ref => ref.evidence_id === selectedEvidenceId) + 1 : 0;
   const intentMessage = readOnly || !intentTerm ? null
-    : isAttachingMention ? `Adding a mention to ${intentTerm}. Mark the text. Esc cancels.`
+    : isAttachingMention ? `Adding a mention to ${intentTerm}. Mark the text.${escCancels}`
     : selectionIntent === "extend_mention" && extendedMention > 0
-      ? `Adding a segment to mention ${extendedMention} of ${intentTerm}. Mark the text. Esc cancels.` : null;
+      ? `Adding a segment to mention ${extendedMention} of ${intentTerm}. Mark the text.${escCancels}` : null;
 
   const openReviewTargets = reviewTargets.filter(
     (t) => !(draft.decisions ?? []).some((d) => refKey(d.target) === refKey(t)),
@@ -3467,14 +3606,8 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
     const item = pendingReanchorItems.find(item => (key === undefined || reanchorKey(item) === key)
       && !currentReanchorResolution(item, draft.reanchor_resolutions ?? [], draft.annotations ?? []));
     if (!item) return;
-    setSubmitDialogOpen(false); setMobilePane("list");
-    requestAnimationFrame(() => {
-      const row = [...(sidebarScrollRef.current?.querySelectorAll<HTMLElement>('[data-reanchor-item]') ?? [])]
-        .find(row => row.dataset.reanchorItem === reanchorKey(item));
-      const disclosure = row?.closest("details");
-      if (disclosure) disclosure.open = true;
-      row?.scrollIntoView?.({ block: "nearest" }); row?.querySelector<HTMLButtonElement>('button')?.focus();
-    });
+    setSubmitDialogOpen(false);
+    selectReanchor(item, { focusRow: true });
   };
 
   const blockInvalidUnresolvedNotes = (action: "submitting" | "leaving" = "submitting") => {
@@ -3717,6 +3850,10 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
     setDetailsCollapsed(collapsed);
     window.requestAnimationFrame(() => rootRef.current?.querySelector<HTMLElement>(collapsed ? ".details-rail-expand" : ".details-rail-collapse")?.focus());
   };
+  /** The name of what the folded column would show: the selected finding, else the selected proposal (issue 596). */
+  const stripSelection = !detailsCollapsed ? null
+    : selectedAnnotation ? termLabel(selectedAnnotation.annotation.layer_id, selectedAnnotation.annotation.term_id) || selectedAnnotation.annotation.term_id
+      : selectedTarget?.term_id ? termLabel(selectedTarget.layer_id ?? "", selectedTarget.term_id) || selectedTarget.term_id : null;
   // Work that needs the panel (a new mark and its term search, a required note, …) opens a collapsed column again.
   useEffect(() => {
     if (detailsCollapsed && inspectorDemand.active) setDetailsCollapsed(false);
@@ -3948,9 +4085,17 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
     void handleReviewDecision({ outcome: null });
   }, { ...reviewShortcutOptions, description: "Reset selected review decision to open, or discard your copy" });
   // Single-character bindings ignore Shift, so Shift+N reaches this handler too.
-  useShortcut("n", event => goToUnchecked(event.shiftKey ? -1 : 1) ? undefined : false,
-    { ...shortcutOptions, enabled: carriedActive && !display, group: "Carried findings", description: "Next unchecked carried finding" });
+  // Without carried findings, "n" moves through the items that need review after the text change (issue 633).
+  const reanchorStepping = !carriedActive && unresolvedReanchorCount > 0;
+  useShortcut("n", event => {
+    if (carriedActive) return goToUnchecked(event.shiftKey ? -1 : 1) ? undefined : false;
+    const next = nextPendingReanchor(selectedReanchorKey, event.shiftKey ? -1 : 1);
+    if (!next) return false;
+    selectReanchor(next, { focusRow: true });
+  }, { ...shortcutOptions, enabled: (carriedActive || reanchorStepping) && !display,
+    group: carriedActive ? "Carried findings" : "Text change", description: carriedActive ? "Next unchecked carried finding" : "Next item that needs review after the text change" });
   useShortcutHint(["Shift + N"], "Previous unchecked carried finding", { group: "Carried findings", enabled: carriedActive && !display });
+  useShortcutHint(["Shift + N"], "Previous item that needs review after the text change", { group: "Text change", enabled: reanchorStepping && !display });
   const checkableCarried = selectedCarriedState?.unchecked && !carried.busy(selectedCarriedState.input.input_id) ? selectedCarriedState : undefined;
   useShortcut("c", event => {
     // Plain "c" only: Shift+C is not this shortcut.
@@ -4080,6 +4225,14 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
       return entry ? { ...mention, label: attachCopy.targetName(attachModifier!.termLabel, entry.term) } : mention;
     }),
     ...sourceMentions,
+    // Each item that needs review after the text change, where its words are now or where they were (issue 633).
+    ...(display ? [] : pendingReanchorItems.filter(item => !currentReanchorResolution(item, draft.reanchor_resolutions ?? [], draft.annotations ?? []))
+      .flatMap(item => {
+        const term = termLabel(item.layer_id, item.term_id) || item.term_id, words = oldWords(item);
+        return reanchorMarks(item).map(mark => ({ evidence_id: mark.id, segments: mark.segments, kind: "pending" as const,
+          label: mark.place === null ? `${term}: was “${words}”. Needs review after the text change.`
+            : `${term} on “${words}”: needs review after the text change.` }));
+      })),
     ...(pendingAnnotation && !pendingAnnotation.isSpanless && pendingAnnotation.evidenceId
       ? [{ evidence_id: pendingAnnotation.evidenceId, segments: pendingAnnotation.segments }]
       : []),
@@ -4129,12 +4282,15 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
           {assignmentNavigation
             ? <h1 className="case-title" title={view.document.document_id}><LanguageText text={taskText(assignmentNavigation.current)} code={assignmentNavigation.current.language} /></h1>
             : <><h1 className="case-title" title={view.document.document_id}>{view.document.document_id}</h1><LanguageTag code={view.document.language} /></>}
-          <span
-            title={roundTitle ?? (roundKind !== "consolidation" && !isCarryKind(roundKind) ? badge.title : undefined)}
-            className="case-mode"
-          >
-            {roundKind === "consolidation" ? modeBadge("review").label : roundKind === "text_change" && roundInputs.length > 0 ? TEXT_CHANGE_ORIGIN : isCarryKind(roundKind) ? roundBadge ?? "Review carried findings" : badge.label}
-          </span>
+          {(() => {
+            // Issue 652: "Check after text change" only while something still needs a check; then the round's name.
+            const textChangeOpen = roundKind === "text_change" && (carried.states.some(state => state.unchecked) || unresolvedReanchorCount > 0);
+            const modeText = roundKind === "consolidation" ? modeBadge("review").label : textChangeOpen ? TEXT_CHANGE_ORIGIN : isCarryKind(roundKind) ? roundBadge ?? "Review carried findings" : badge.label;
+            // Issue 596: in the merged bar a long mode takes two lines rather than an ellipsis; --mode-half is about
+            // half its length, the least width at which two lines hold it (editor.css).
+            return <span title={roundTitle ?? (roundKind !== "consolidation" && !isCarryKind(roundKind) ? badge.title : undefined)}
+              className="case-mode" style={{ "--mode-half": `${Math.ceil(modeText.length / 2) + 1}ch` } as CSSProperties}>{modeText}</span>;
+          })()}
           {readOnly && consolidationAssignmentId ? <a className="btn btn-secondary btn-sm" href={routeHref({ name: "task", assignmentId: consolidationAssignmentId })} onKeyDown={onSpaceActivate}>{BACK_TO_CONSOLIDATION}</a> : null}
           {/* The display name has a bounded width (full text in the title), so the header
               does not need another line; the pseudonym is never shortened. */}
@@ -4279,8 +4435,8 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
         <aside className="sidebar density-compact" id="findings-column">
           {/* Narrow layout: attach mode opens on Findings, where the text pane's banner and its Cancel are out of sight. */}
           {panesLayout && attachActive && attachModifier && mobilePane === "list" && <div role="status" className="attach-mention-banner attach-mention-banner--list">
-            <span>{attachCopy.banner(attachModifier.termLabel)}</span>
-            <Button size="sm" aria-keyshortcuts="Escape" onClick={cancelAttachModifier}>Cancel (Esc)</Button>
+            <span>{attachCopy.banner(attachModifier.termLabel, touchOnly)}</span>
+            <Button size="sm" aria-keyshortcuts={touchOnly ? undefined : "Escape"} onClick={cancelAttachModifier}>{touchOnly ? "Cancel" : "Cancel (Esc)"}</Button>
           </div>}
           {/* Multi-layer controls (rendered only if >1 layer) */}
           <LayerControls
@@ -4296,6 +4452,9 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
 
           <div className="sidebar-scroll" ref={sidebarScrollRef}>
             <ReanchorPanel key={versionIdentity} items={pendingReanchorItems} labelFor={termLabel} onContext={reanchorContext.reveal}
+              selectedKey={selectedReanchorKey} placeOf={item => reanchorPlaces[reanchorKey(item)] ?? 0}
+              onSelect={(item, place) => selectReanchor(item, { place })} valuesOf={reanchorValues} onResolved={afterReanchorResolved}
+              onUseLocation={readOnly ? undefined : applyReanchorLocation}
               onOpenFinding={id => { setSelectedTargetId(null); setSelectedSourceId(null); cancelPending(); setSelectedAnnotationId(id); setMobilePane("details"); }}
               resolutions={draft.reanchor_resolutions} annotations={draft.annotations} busy={queueState === "saving"}
               recreateUnavailableReason={item=>!view.scope.editable_layer_ids.includes(item.layer_id) || !view.layers?.find(layer=>layer.layer_id===item.layer_id)?.annotation_types.some(type=>type.type_id===item.type_id)
@@ -4511,9 +4670,10 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
           text={view.document.text}
           mentions={textMentions}
           isAttachingMention={attachActive || pickingText}
-          attachMessage={attachActive && attachModifier ? attachCopy.banner(attachModifier.termLabel)
-            : linkSpan ? `Select the text for ${linkSpan.term}, then press Enter. Esc cancels.`
-            : activeCarried ? `Select supporting text to re-create ${carriedTermText(activeCarried.source_snapshot)}.` : activeReanchor ? `Select supporting text to re-create ${activeReanchor.term_id}. Save the finding, review its values, then complete the text-change review.` : pendingEvidenceAdoption ? `${targetRequiresSpan(pendingEvidenceAdoption) ? "This annotation type requires a text span. " : ""}Select supporting text to create an editable copy of this proposal. The current decision is kept until you confirm the replacement.` : undefined}
+          attachMessage={attachActive && attachModifier ? attachCopy.banner(attachModifier.termLabel, touchOnly)
+            // Releasing the mouse (or Shift after Shift + arrows) links the span; Enter is not needed (issue 612).
+            : linkSpan ? `Select the text for ${linkSpan.term}.${escCancels}`
+            : activeCarried ? `Select supporting text to re-create ${carriedTermText(activeCarried.source_snapshot)}.` : activeReanchor ? `Select supporting text to re-create ${termLabel(activeReanchor.layer_id, activeReanchor.term_id) || activeReanchor.term_id}${reanchorMarks(activeReanchor).length ? "" : `: “${oldWords(activeReanchor)}” is not in the corrected text`}.` : pendingEvidenceAdoption ? `${targetRequiresSpan(pendingEvidenceAdoption) ? "This annotation type requires a text span. " : ""}Select supporting text to create an editable copy of this proposal. The current decision is kept until you confirm the replacement.` : undefined}
           intentMessage={intentMessage}
           // TextPane owns Esc while a banner is shown (window capture): each mode cancels through its own handler.
           onCancelAttach={attachActive ? cancelAttachModifier : linkSpan ? cancelLinkSpan : cancelAttach}
@@ -4541,9 +4701,14 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
           <IconButton size="sm" variant="quiet" className="details-rail-collapse" label="Collapse details panel" icon={<IconChevronRight />}
             aria-expanded aria-controls="details-column" onClick={() => collapseDetails(true)} />
         </div>}
-        {detailsCollapsed && <button type="button" className="details-rail-expand" aria-label="Expand details panel" title="Expand details panel"
+        {/* Issue 596: a finding or proposal selected while the column is folded is named on the strip, under "Details". */}
+        {detailsCollapsed && <button type="button" className="details-rail-expand" aria-label="Expand details panel"
+          title={stripSelection ? `Expand details panel (selected: ${stripSelection})` : "Expand details panel"}
+          aria-describedby={stripSelection ? "details-strip-selection" : undefined}
           aria-expanded={false} aria-controls="details-column" onClick={() => collapseDetails(false)}>
-          <IconChevronLeft /><span className="details-rail-strip-label" aria-hidden="true">Details</span></button>}
+          <IconChevronLeft /><span className="details-rail-strip-label" aria-hidden="true">Details</span>
+          {stripSelection && <span id="details-strip-selection" className="details-rail-strip-selection">
+            <span className="visually-hidden">Selected: </span>{stripSelection}</span>}</button>}
         {/* Right: Annotation & Search Panel + Review Actions */}
         <div className="inspector-pane density-compact" id="details-column" ref={inspectorRef}>
           {/* A low window with the tree open (issue 521): the finding in one line, and the way back to the whole panel. */}
@@ -4576,6 +4741,7 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
               await flushAnnotationNotes();
               if(unsavedAnnotationNotes().length) return;
               await resolveReanchor(selectedReanchorItem,"recreated",selectedAnnotation.annotation.annotation_id);
+              afterReanchorResolved(selectedReanchorItem);
             })().catch(reportError);}}>Complete text-change review</Button>
           </InlineMessage>}
           {selectedSource ? (
@@ -4646,7 +4812,7 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
                     <DismissibleHint id="adjust-mark">Adjust the marked text with its edge handles, or mark new text to replace it.</DismissibleHint>
                   </>
                   : <p>
-                    {pendingAnnotation.carriedInput ? "Save this finding with the original term and values. Then check it and mark it as checked." : pendingAnnotation.reanchorItem ? "Save this finding, check its evidence and values, then complete the text-change review." : "Select a term from the ontology for the new finding."}
+                    {pendingAnnotation.carriedInput ? "Save this finding with the original term and values. Then check it and mark it as checked." : pendingAnnotation.reanchorItem ? (valuesToCheck(pendingAnnotation.reanchorItem) ? "Save this finding, confirm its values, then complete the text-change review." : "Save this finding with the original term and values; this completes its text-change review.") : "Select a term from the ontology for the new finding."}
                   </p>}
                 {pendingAnnotation.reanchorItem && <>
                   <p><TermName termId={savedPendingReanchor?.annotation.term_id ?? pendingAnnotation.reanchorItem.term_id} label={termLabel(pendingAnnotation.layerId,savedPendingReanchor?.annotation.term_id ?? pendingAnnotation.reanchorItem.term_id)} />, {pendingAnnotation.layerId}</p>
@@ -4777,10 +4943,11 @@ const CaseScreenBody: React.FC<CaseScreenProps> = ({
                 <p className="field-hint">{changes.length ? `Changes: ${changes.join("; ")}.` : "No changes yet. Edit the term, values or text below; the proposal counts as replaced once the copy differs."}</p>
                 {/* Issue 257: an unchanged copy goes on Done; Discard copy is the way back that drops the copy. */}
                 <div className="review-actions__row">
-                  <Button type="button" variant="primary" size="sm" onClick={() => {
+                  {/* Issue 612: read-only, nothing is done here; a plain way back, not the primary action. */}
+                  <Button type="button" variant={readOnly ? "secondary" : "primary"} size="sm" onClick={() => {
                     if (readOnly) { selectProposal(replaced); return; }
                     void discardCopy(replaced, { from: "copy", onlyUnchanged: true });
-                  }}>Done, back to the proposal</Button>
+                  }}>{readOnly ? "Back to the proposal" : "Done, back to the proposal"}</Button>
                   {!readOnly && <Button type="button" size="sm" onClick={() => { void discardCopy(replaced, { from: "copy" }); }}>
                     <IconUndo />Discard copy
                   </Button>}

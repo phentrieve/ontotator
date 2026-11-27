@@ -115,7 +115,7 @@ for (const size of SIZES) {
       const s = await open(page, size);
       await selectProposal(page);
       await panel(page).getByRole("button", { name: "Link a text span", exact: true }).click();
-      await expect(page.locator(".attach-mention-banner")).toContainText("Select the text for Recurrent, then press Enter. Esc cancels.");
+      await expect(page.locator(".attach-mention-banner")).toContainText("Select the text for Recurrent. Esc cancels.");
       await expect(textPane(page)).toBeInViewport();
       const linked = commandResponse(page, "set_modifier_segments");
       const decided = decisionResponse(page);

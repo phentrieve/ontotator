@@ -9,7 +9,7 @@ vi.mock("../../src/api/client", async importOriginal => ({ ...(await importOrigi
 
 const { ApiError, AuthError, ConflictError } = await import("../../src/api/client");
 const { DiscardedChangesError } = await import("../../src/editor/autosave");
-const { useCarriedReview } = await import("../../src/editor/carried/useCarriedReview");
+const { useCarriedReview, recreatedAnnotationId, recreatedInputOf } = await import("../../src/editor/carried/useCarriedReview");
 
 const annotation = (id: string) => ({ annotation_id: id, layer_id: "hpo", type_id: "phenotype", term_id: "HP:0001250" });
 const snapshot = (id: string, version = "v1") => ({ annotation: annotation(id), version });
@@ -272,15 +272,20 @@ describe("useCarriedReview", () => {
     expect(t.announce).toHaveBeenCalledWith("Seizure needs a new check. 0 of 1 checked.");
   });
 
-  it("remembers recreated findings and links to them", async () => {
-    const t = setup({ draft: draftOf([snapshot("b-2", "v7")]) });
-    act(() => t.hook.result.current.rememberRecreated("in-1", "b-2"));
-    expect(t.hook.result.current.recreatedFor).toEqual({ "in-1": "b-2" });
+  it("links a finding re-created for an input by its ID, also after a reload, without checking the input (issue 652)", async () => {
+    const id = recreatedAnnotationId("in-1");
+    expect(recreatedInputOf(id)).toBe("in-1");
+    expect(recreatedInputOf("ann-0b9c6d1e-2f3a-4b5c-8d7e-9f0a1b2c3d4e")).toBeNull();
+    // A fresh hook over the saved draft stands for a reload: nothing was remembered on the client.
+    const t = setup({ draft: draftOf([snapshot(id, "v7"), snapshot(recreatedAnnotationId("in-other"))]) });
+    expect(t.hook.result.current.recreatedFor).toEqual({ "in-1": id });
+    expect(t.state().unchecked).toBe(true);
+    expect(t.queue.enqueue).not.toHaveBeenCalled();
     await act(async () => { void t.hook.result.current.markChecked(t.state()); await Promise.resolve(); });
     apiMock.resolveRoundInput.mockResolvedValueOnce(baseDraft);
     await t.attempt();
     expect((apiMock.resolveRoundInput.mock.calls[0][1] as MutationEnvelope).payload).toEqual({
-      input_id: "in-1", outcome: "completed", annotation_ref: { annotation_id: "b-2", version: "v7" },
+      input_id: "in-1", outcome: "completed", annotation_ref: { annotation_id: id, version: "v7" },
     });
   });
 

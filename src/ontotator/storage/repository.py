@@ -52,7 +52,11 @@ from ontotator.domain.errors import (
 from ontotator.domain.guidelines import guideline_ref
 from ontotator.domain.profiles import OntologyDefinition, TaskProfile, profile_hash
 from ontotator.domain.project_rules import ProjectRules
-from ontotator.domain.reanchor_resolution import PendingReanchorRef, ReanchorItem
+from ontotator.domain.reanchor_resolution import (
+    PendingReanchorRef,
+    ReanchorItem,
+    with_relocation,
+)
 from ontotator.domain.results import latest_submissions
 from ontotator.domain.review import ReviewDecision, ReviewTargetSet
 from ontotator.domain.scopes import TaskScope, build_scope, is_review_like
@@ -2788,6 +2792,7 @@ class Repository:
         }
         if not refs or not is_review_like(draft.key.mode):
             return []
+        document = self.get_document(draft.key.project_key, draft.key.document_id)
         items = []
         for raw in self.get_reanchor_items(
             draft.key.project_key, draft.key.document_id
@@ -2805,19 +2810,22 @@ class Repository:
                     proposal_set_id=raw["proposal_set_id"], source_ref=raw["source_ref"]
                 ),
             )
+            item = ReanchorItem.model_validate(
+                {
+                    **raw,
+                    "type_id": source.annotation.type_id if content_valid else None,
+                    "axes_values": source.annotation.axes_values
+                    if content_valid
+                    else None,
+                    "axes_defaulted": source.annotation.axes_defaulted
+                    if content_valid
+                    else None,
+                }
+            )
             items.append(
-                ReanchorItem.model_validate(
-                    {
-                        **raw,
-                        "type_id": source.annotation.type_id if content_valid else None,
-                        "axes_values": source.annotation.axes_values
-                        if content_valid
-                        else None,
-                        "axes_defaulted": source.annotation.axes_defaulted
-                        if content_valid
-                        else None,
-                    }
-                )
+                with_relocation(item, document.text)
+                if content_valid and document is not None
+                else item
             )
         return items
 
@@ -2848,19 +2856,6 @@ class Repository:
             )
             if current is None or current["origin"] != "correction":
                 raise DomainError("INVALID_REANCHOR_ITEM")
-            previous = (
-                conn.execute(
-                    select(DocumentRow).where(
-                        DocumentRow.project_id == project_id,
-                        DocumentRow.document_id == current["derived_from"],
-                        DocumentRow.case_id == current["case_id"],
-                        DocumentRow.language == current["language"],
-                        DocumentRow.version == current["version"] - 1,
-                    )
-                )
-                .mappings()
-                .one_or_none()
-            )
             producer = (
                 conn.execute(
                     select(ProposalSetRow).where(
@@ -2873,7 +2868,7 @@ class Repository:
                 .mappings()
                 .one_or_none()
             )
-            if previous is None or producer is None:
+            if producer is None:
                 raise DomainError("INVALID_REANCHOR_ITEM")
             pending = next(
                 (
@@ -2885,52 +2880,92 @@ class Repository:
             )
             if pending is None:
                 raise DomainError("INVALID_REANCHOR_ITEM")
-            members = conn.execute(
-                select(ProposalSetRow.id, AnnotationSnapshotRow.payload)
-                .join(
-                    ProposalAnnotationRow,
-                    and_(
-                        ProposalAnnotationRow.project_id == ProposalSetRow.project_id,
-                        ProposalAnnotationRow.proposal_set_id == ProposalSetRow.id,
-                    ),
-                )
-                .join(
-                    AnnotationSnapshotRow,
-                    and_(
-                        AnnotationSnapshotRow.project_id
-                        == ProposalAnnotationRow.project_id,
-                        AnnotationSnapshotRow.annotation_id
-                        == ProposalAnnotationRow.annotation_id,
-                        AnnotationSnapshotRow.version == ProposalAnnotationRow.version,
-                    ),
-                )
-                .where(
-                    ProposalSetRow.project_id == project_id,
-                    ProposalSetRow.document_id == previous["document_id"],
-                    AnnotationSnapshotRow.document_id == previous["document_id"],
-                    AnnotationSnapshotRow.annotation_id
-                    == item.source_ref.annotation_id,
-                    AnnotationSnapshotRow.version == item.source_ref.version,
-                )
-            ).all()
-            for source_set_id, payload in members:
-                expected = (
-                    f"{key.project_key}:reanchor:{key.document_id}:{source_set_id}"
-                )
-                if producer["annotation_set_id"] == expected:
-                    source = decode_snapshot(payload)
-                    content_valid = (
-                        source.text_sha256 == previous["text_sha256"]
-                        and source.document_id == previous["document_id"]
-                        and source.annotation.document_id == previous["document_id"]
-                        and source.annotation.annotation_id
-                        == item.source_ref.annotation_id
-                        and source.version == item.source_ref.version
-                        and source.annotation.layer_id == pending["layer_id"]
-                        and source.annotation.term_id == pending["term_id"]
+            # The proposal is one of the set the producer was re-anchored
+            # from, on the version before; an item that set carried on from
+            # its own source set (#650) is followed back to the proposal.
+            while True:
+                previous = (
+                    conn.execute(
+                        select(DocumentRow).where(
+                            DocumentRow.project_id == project_id,
+                            DocumentRow.document_id == current["derived_from"],
+                            DocumentRow.case_id == current["case_id"],
+                            DocumentRow.language == current["language"],
+                            DocumentRow.version == current["version"] - 1,
+                        )
                     )
-                    return source, content_valid
-            raise DomainError("INVALID_REANCHOR_ITEM")
+                    .mappings()
+                    .one_or_none()
+                )
+                if previous is None:
+                    raise DomainError("INVALID_REANCHOR_ITEM")
+                prefix = f"{key.project_key}:reanchor:{current['document_id']}:"
+                members = conn.execute(
+                    select(ProposalSetRow.id, AnnotationSnapshotRow.payload)
+                    .join(
+                        ProposalAnnotationRow,
+                        and_(
+                            ProposalAnnotationRow.project_id
+                            == ProposalSetRow.project_id,
+                            ProposalAnnotationRow.proposal_set_id == ProposalSetRow.id,
+                        ),
+                    )
+                    .join(
+                        AnnotationSnapshotRow,
+                        and_(
+                            AnnotationSnapshotRow.project_id
+                            == ProposalAnnotationRow.project_id,
+                            AnnotationSnapshotRow.annotation_id
+                            == ProposalAnnotationRow.annotation_id,
+                            AnnotationSnapshotRow.version
+                            == ProposalAnnotationRow.version,
+                        ),
+                    )
+                    .where(
+                        ProposalSetRow.project_id == project_id,
+                        ProposalSetRow.document_id == previous["document_id"],
+                        AnnotationSnapshotRow.document_id == previous["document_id"],
+                        AnnotationSnapshotRow.annotation_id
+                        == item.source_ref.annotation_id,
+                        AnnotationSnapshotRow.version == item.source_ref.version,
+                    )
+                ).all()
+                for source_set_id, payload in members:
+                    if producer["annotation_set_id"] == f"{prefix}{source_set_id}":
+                        source = decode_snapshot(payload)
+                        content_valid = (
+                            source.text_sha256 == previous["text_sha256"]
+                            and source.document_id == previous["document_id"]
+                            and source.annotation.document_id == previous["document_id"]
+                            and source.annotation.annotation_id
+                            == item.source_ref.annotation_id
+                            and source.version == item.source_ref.version
+                            and source.annotation.layer_id == pending["layer_id"]
+                            and source.annotation.term_id == pending["term_id"]
+                        )
+                        return source, content_valid
+                # The set the producer was re-anchored from. It holds the
+                # item too, unless it was stored before #650: such a set
+                # lacks the items it carried on, and a later job carried
+                # them on from what it would hold. The proposal at the end
+                # of the chain is checked against the item all the same.
+                carried_from = next(
+                    (
+                        row
+                        for row in conn.execute(
+                            select(ProposalSetRow).where(
+                                ProposalSetRow.project_id == project_id,
+                                ProposalSetRow.document_id == previous["document_id"],
+                                ProposalSetRow.origin == "reanchor",
+                            )
+                        ).mappings()
+                        if producer["annotation_set_id"] == f"{prefix}{row['id']}"
+                    ),
+                    None,
+                )
+                if carried_from is None:
+                    raise DomainError("INVALID_REANCHOR_ITEM")
+                current, producer = previous, carried_from
 
     def _lock_round_assignment(self, conn: Connection, key: WorkspaceKey) -> None:
         from ontotator.storage.tables import AssignmentRow

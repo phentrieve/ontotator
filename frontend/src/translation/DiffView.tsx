@@ -5,6 +5,16 @@ import { diffText, type TextDiffPart } from "./textDiff";
 import "./translation.css";
 
 /**
+ * One piece of a diff: deleted words are generated content (never found or copied), inserted ones are `<ins>`.
+ * With `invisibles`, invisible characters get a visible mark (issue 454).
+ */
+export function diffPartNode(op: TextDiffPart["op"], text: string, key: string, invisibles = false): ReactNode {
+  const deleted = op === "delete";
+  const content = invisibles ? invisibleNodes(text, key, { generated: deleted }) : deleted ? generatedText(text) : text;
+  return deleted ? <del key={key} data-diff-op={op}>{content}</del> : op === "insert" ? <ins key={key} data-diff-op={op}>{content}</ins> : <span key={key} data-diff-op={op}>{content}</span>;
+}
+
+/**
  * Text nodes with hidden paragraph markers for coupled scrolling.
  * Markers address the proposed text: deleted words never advance its coordinates.
  * Without deletions the rendered characters equal `after` exactly.
@@ -17,12 +27,7 @@ export function paragraphNodes(after: string, parts: readonly TextDiffPart[], { 
   let position = 0, paragraph = 0, key = 0;
   const marker = () => nodes.push(<span key={`p${paragraph}`} aria-hidden="true" data-paragraph={paragraph} data-paragraph-offset={starts[paragraph++]} />);
   for (const part of parts) {
-    const chunk = (text: string) => {
-      if (!text) return;
-      const id = `t${key++}`, deleted = part.op === "delete";
-      const content = invisibles ? invisibleNodes(text, id, { generated: deleted }) : deleted ? generatedText(text) : text;
-      nodes.push(part.op === "delete" ? <del key={id} data-diff-op={part.op}>{content}</del> : part.op === "insert" ? <ins key={id} data-diff-op={part.op}>{content}</ins> : <span key={id} data-diff-op={part.op}>{content}</span>);
-    };
+    const chunk = (text: string) => { if (text) nodes.push(diffPartNode(part.op, text, `t${key++}`, invisibles)); };
     if (part.op === "delete") { if (deletions) chunk(part.text); continue; }
     const points = Array.from(part.text);
     let offset = 0;

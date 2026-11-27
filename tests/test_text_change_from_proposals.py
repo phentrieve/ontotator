@@ -558,3 +558,245 @@ def test_work_from_scratch_still_moves_and_carries(tmp_path):
     assert moved.json()["assignment"]["document_id"] == v2
     preview = _preview_carry(env, submission_id, v2)
     assert preview.status_code == 200, preview.text
+
+
+# --- issue 650: proposals that wait for a check ------------------------------ #
+
+
+def _correction(env: Any, parent: Any, text: str, version: int) -> tuple[str, Any]:
+    """Import a correction of ``parent`` (a unit) with ``text``; runs its
+    re-anchor jobs. Returns the new version's document ID and its unit."""
+    from t1_builders import bundle, correction_unit
+    from t1_fixtures import run_import
+
+    from ontotator.auth.audit import Actor
+
+    child = correction_unit(parent, text)
+    units = [env.c1_unit, *([parent] if parent is not env.c1_unit else []), child]
+    folder = env.tmp_path / f"v{version}"
+    folder.mkdir()
+    job = run_import(env.db, bundle(folder, units), actor=Actor.cli())
+    assert job.status == "succeeded", job.error
+    _run_reanchor_jobs(env)
+    with env.db.transaction() as conn:
+        document_id = conn.execute(
+            select(DocumentRow.document_id).where(
+                DocumentRow.project_id == env.pid,
+                DocumentRow.case_id == "c1",
+                DocumentRow.language == "en",
+                DocumentRow.version == version,
+            )
+        ).scalar_one()
+    return str(document_id), child
+
+
+def _items(env: Any, document_id: str) -> list[dict[str, Any]]:
+    return list(env.app.state.repo.get_reanchor_items("proj", document_id))
+
+
+def _text(env: Any, document_id: str) -> str:
+    return str(env.app.state.repo.get_document("proj", document_id).text)
+
+
+def test_all_proposals_waiting_for_a_check_still_count_as_proposals(tmp_path):
+    from t1_fixtures import TEXT
+
+    env = proposal_env(tmp_path)
+    work = assign(env, env.c1, "anno")
+    # The correction changes the words of every proposal: v2's carried set
+    # has no proposal, only three needs-review items.
+    reworded = TEXT.replace(OLD_WORD, NEW_WORD).replace("Krampfanfälle", "Anfälle")
+    v2, _ = _correction(env, env.c1_unit, reworded, 2)
+    assert _proposals(env, v2) == []
+    assert len(_items(env, v2)) == 3
+
+    # Counts stay honest; the mode stays "from proposals".
+    row = _rows(env)[("c1", "en")]
+    assert row["proposal_count"] == 0
+    assert row["annotation_mode"]["mode"] == "proposals"
+    assert row["annotation_mode"]["source"] != "no_proposals"
+
+    # A batch assignment does not skip it.
+    shown = env.lead.post(
+        f"{BASE}/assignments/batch/preview",
+        json={
+            "task": "annotate",
+            "language": "en",
+            "case_ids": ["c1"],
+            "mode": "one",
+            "usernames": ["tom"],
+        },
+    )
+    assert shown.status_code == 200, shown.text
+    assert [t["document_id"] for t in shown.json()["targets"]] == [v2]
+    assert shown.json()["skipped"] == []
+
+    # The open task moves to v2 and shows the items there.
+    moved = _move(env, work["id"], v2)
+    assert moved.status_code == 200, moved.text
+    opened = _round_on(env, "anno", v2)
+    view = opened["view"]
+    assert view["key"]["mode"] == "proposal_check"
+    assert view["targets"]["targets"] == []
+    pending = view["pending_reanchor_items"]
+    assert sorted(item["term_id"] for item in pending) == sorted(
+        item["term_id"] for item in _items(env, v2)
+    )
+    assert all(item["type_id"] == "phenotype" for item in pending)
+
+    # A new assignment of v2 is from proposals, with the same items.
+    again = assign(env, v2, "anno2")
+    assert again["annotation_mode"] == "proposals"
+    second = open_task(env, "anno2", again["id"])
+    assert len(second["view"]["pending_reanchor_items"]) == 3
+
+
+def test_started_work_moves_onto_a_version_whose_proposals_all_wait(tmp_path):
+    from t1_fixtures import TEXT
+
+    env = proposal_env(tmp_path)
+    work = assign(env, env.c1, "anno")
+    opened = open_task(env, "anno", work["id"])
+    _decide(env, "anno", opened, ["confirmed", None, None])
+    reworded = TEXT.replace(OLD_WORD, NEW_WORD).replace("Krampfanfälle", "Anfälle")
+    v2, _ = _correction(env, env.c1_unit, reworded, 2)
+    moved = _move(env, work["id"], v2)
+    assert moved.status_code == 200, moved.text
+    again = _round_on(env, "anno", v2)
+    # The accepted p1 has no counterpart: it is the person's own finding,
+    # marked Check needed (#414).
+    [check] = _inputs(env, again)
+    assert check["mapping_status"] == "needs_review"
+
+
+def test_a_waiting_proposal_survives_a_second_correction(tmp_path):
+    from t1_fixtures import TEXT
+
+    env = proposal_env(tmp_path)
+    # v1 -> v2 rewords only p2's words: p2 waits for a check on v2.
+    v2, v2_unit = _correction(env, env.c1_unit, TEXT.replace(OLD_WORD, NEW_WORD), 2)
+    [waiting] = _items(env, v2)
+    # v2 -> v3 changes another sentence only (and moves the text by 3).
+    v3_text = "Bef: " + TEXT.replace(OLD_WORD, NEW_WORD).replace("2 Wochen", "3 Wochen")
+    v3, _ = _correction(env, v2_unit, v3_text, 3)
+    assert sorted(_local(s) for s in _proposals(env, v3)) == ["a1", "a2"]
+    [carried] = _items(env, v3)
+    # The proposal and its old words stay those of v1 ...
+    for field in ("source_ref", "term_id", "layer_id", "reason", "old_mentions"):
+        assert carried[field] == waiting[field]
+    assert carried["old_context"] == waiting["old_context"]
+    assert OLD_WORD in carried["old_context"]["text"]
+    # ... the new context is that of v3.
+    new = carried["new_context"]
+    assert new["text"] == _text(env, v3)[new["start"] : new["end"]]
+    assert NEW_WORD in new["text"]
+    assert new["start"] == waiting["new_context"]["start"] + len("Bef: ")
+    assert carried["diff"][0]["new_start"] == new["start"]
+
+    # A task on v3 shows it, located in v3's text, and can decide it.
+    work = assign(env, v3, "anno")
+    opened = open_task(env, "anno", work["id"])
+    [item] = opened["view"]["pending_reanchor_items"]
+    assert item["type_id"] == "phenotype"
+    assert item["changed_at"]["text"] == NEW_WORD
+    assert _text(env, v3)[item["changed_at"]["start"] :].startswith(NEW_WORD)
+    dismissed = client(env, "anno").post(
+        f"/api/v1/workspaces/{opened['workspace_id']}/reanchor-resolutions",
+        json={
+            "mutation_id": f"dismiss-{uuid4().hex}",
+            "expected_revision": opened["view"]["draft"]["revision"],
+            "payload": {
+                "item": {
+                    "proposal_set_id": item["proposal_set_id"],
+                    "source_ref": item["source_ref"],
+                },
+                "outcome": "dismissed",
+                "reason": "not in the text",
+            },
+        },
+    )
+    assert dismissed.status_code == 200, dismissed.text
+
+
+def test_a_resolved_waiting_proposal_does_not_come_back_for_its_task(tmp_path):
+    from t1_fixtures import TEXT
+
+    env = proposal_env(tmp_path)
+    v2, v2_unit = _correction(env, env.c1_unit, TEXT.replace(OLD_WORD, NEW_WORD), 2)
+    work = assign(env, v2, "anno")
+    opened = open_task(env, "anno", work["id"])
+    [item] = opened["view"]["pending_reanchor_items"]
+    dismissed = client(env, "anno").post(
+        f"/api/v1/workspaces/{opened['workspace_id']}/reanchor-resolutions",
+        json={
+            "mutation_id": f"dismiss-{uuid4().hex}",
+            "expected_revision": opened["view"]["draft"]["revision"],
+            "payload": {
+                "item": {
+                    "proposal_set_id": item["proposal_set_id"],
+                    "source_ref": item["source_ref"],
+                },
+                "outcome": "dismissed",
+                "reason": "not meant",
+            },
+        },
+    )
+    assert dismissed.status_code == 200, dismissed.text
+    v3_text = TEXT.replace(OLD_WORD, NEW_WORD).replace("2 Wochen", "3 Wochen")
+    v3, _ = _correction(env, v2_unit, v3_text, 3)
+    assert len(_items(env, v3)) == 1  # the tool's proposal still waits on v3
+
+    # The task that decided it moves on without it ...
+    moved = _move(env, work["id"], v3)
+    assert moved.status_code == 200, moved.text
+    again = _round_on(env, "anno", v3)
+    assert again["view"]["pending_reanchor_items"] == []
+    # ... while a new task on v3 checks it for itself.
+    other = assign(env, v3, "anno2")
+    fresh = open_task(env, "anno2", other["id"])
+    assert len(fresh["view"]["pending_reanchor_items"]) == 1
+
+
+def test_a_set_stored_before_the_fix_is_no_collision(tmp_path, monkeypatch):
+    """Upgrade: a v2 -> v3 set stored before #650 lacks the item carried on
+    from v2. The v3 -> v4 job re-processes v2 -> v3: that is the same set, it
+    stays as stored, and v4 carries the item on all the same."""
+    from dataclasses import replace
+
+    from t1_fixtures import TEXT
+
+    from ontotator.exchange import reanchor_job
+
+    env = proposal_env(tmp_path)
+    v2_text = TEXT.replace(OLD_WORD, NEW_WORD)
+    v2, v2_unit = _correction(env, env.c1_unit, v2_text, 2)
+    [waiting] = _items(env, v2)
+    # The release before the fix carried no pending item on.
+    sources = reanchor_job.reanchor_sources
+    with monkeypatch.context() as before:
+        before.setattr(
+            reanchor_job,
+            "reanchor_sources",
+            lambda *args: [replace(s, pending_items=()) for s in sources(*args)],
+        )
+        v3_text = v2_text.replace("2 Wochen", "3 Wochen")
+        v3, v3_unit = _correction(env, v2_unit, v3_text, 3)
+    assert _items(env, v3) == []
+
+    v4, _ = _correction(env, v3_unit, "Bef: " + v3_text, 4)
+    with env.db.transaction() as conn:
+        jobs = conn.execute(
+            select(JobRow.status, JobRow.error).where(JobRow.kind == "reanchor")
+        ).all()
+    assert {status for status, _ in jobs} == {"succeeded"}, jobs
+    assert _items(env, v3) == []  # stays as stored
+    [carried] = _items(env, v4)
+    assert carried["source_ref"] == waiting["source_ref"]
+    assert carried["old_context"] == waiting["old_context"]
+    new = carried["new_context"]
+    assert new["text"] == _text(env, v4)[new["start"] : new["end"]]
+    assert NEW_WORD in new["text"]
+    # The item leads back to the proposal across the set stored before.
+    work = assign(env, v4, "anno")
+    [item] = open_task(env, "anno", work["id"])["view"]["pending_reanchor_items"]
+    assert item["type_id"] == "phenotype"

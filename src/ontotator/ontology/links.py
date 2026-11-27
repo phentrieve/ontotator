@@ -40,12 +40,11 @@ def link_template_problem(template: str) -> str | None:
         return "Remove the blanks."
     # The host is fixed: a placeholder there could send the link anywhere.
     host = re.split(r"[/?#]", template.removeprefix("https://"), maxsplit=1)[0]
-    if (
-        not template.startswith("https://")
-        or "{" in host
-        or "}" in host
-        or not urlsplit(template).hostname
-    ):
+    if not template.startswith("https://"):
+        return "Use an https:// address."
+    if "{" in host or "}" in host:
+        return "Put {code} or {id} after the host, not in it."
+    if not urlsplit(template).hostname:
         return "Use an https:// address."
     if any(brace not in LINK_PLACEHOLDERS for brace in _BRACES.findall(template)):
         return "Use only {code} and {id} in braces."

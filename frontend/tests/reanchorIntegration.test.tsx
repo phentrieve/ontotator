@@ -23,14 +23,24 @@ afterEach(()=>{cleanup();vi.restoreAllMocks();});
 it('shows real review-workspace pending inputs and context display without mutating the draft or save queue',async()=>{
   const view=workspaceFixture('target').view;view.key.mode='review';view.scope.mode='review';
   const next={start:0,end:2,text:Array.from(view.document.text).slice(0,2).join('')};
-  const pending=item({new_context:next,diff:[{op:'replace',old_start:100,old_end:item().old_context.end,new_start:0,new_end:2,old_text:item().old_context.text,new_text:next.text}]});
-  view.pending_reanchor_items=[pending];
+  const pending=item({new_context:next,suggestions:[[next]],diff:[{op:'replace',old_start:100,old_end:item().old_context.end,new_start:0,new_end:2,old_text:item().old_context.text,new_text:next.text}]});
+  const lost=item({proposal_set_id:5,new_context:next,diff:pending.diff});
+  view.pending_reanchor_items=[pending,lost];
   const command=vi.spyOn(api,'applyCommand'), submit=vi.spyOn(api,'submitWorkspace');
   const before=JSON.stringify(view.draft);
   const mounted=render(<CaseScreen view={view} workspaceId="w" onClose={()=>{}}/>);
-  await screen.findByRole('heading',{name:'Needs review after the text change (1)'});
-  fireEvent.click(screen.getByRole('button',{name:'HP:1, hpo'}));
-  await waitFor(()=>expect(mounted.container.querySelector('.run--context')?.textContent).toBe(next.text));
+  await screen.findByRole('heading',{name:'Needs review after the text change (2)'});
+  // On opening, an item with a suggested place is marked there in the text; its mark selects its row.
+  const mark=mounted.container.querySelector<HTMLElement>('.app-layout > .center-pane .run--pending')!;
+  expect(mark.textContent).toBe(next.text);expect(mark.classList.contains('run--ghost')).toBe(true);
+  expect(mark.title).toBe('HP:1 on “😀”: needs review after the text change.');
+  fireEvent.click(mark);
+  const rows=mounted.container.querySelectorAll('[data-reanchor-item]');
+  await waitFor(()=>expect(rows[0].getAttribute('aria-current')).toBe('true'));
+  // An item without a reliable location only scrolls the text; nothing is highlighted as its place.
+  fireEvent.click(within(rows[1] as HTMLElement).getByRole('button',{name:'HP:1'}));
+  await waitFor(()=>expect(rows[1].getAttribute('aria-current')).toBe('true'));
+  expect(mounted.container.querySelector('.run--context')).toBeNull();
   expect(command).not.toHaveBeenCalled();expect(submit).not.toHaveBeenCalled();expect(JSON.stringify(view.draft)).toBe(before);
   expect(api.getReanchorItems).not.toHaveBeenCalled();
 });
@@ -52,8 +62,8 @@ function selectCurrentText() {
 it('keeps diagnostic items dismissible when the original finding type is unavailable',async()=>{
   const {view,pending}=editableReanchor();view.pending_reanchor_items=[{...pending,type_id:null}];
   render(<CaseScreen view={view} workspaceId="w" onClose={()=>{}}/>);
-  expect(screen.getByRole('button',{name:'Re-create here'})).toHaveProperty('disabled',true);
-  expect(screen.getByRole('button',{name:'Dismiss with reason'})).toHaveProperty('disabled',false);
+  expect(screen.getByRole('button',{name:'Mark in text'}).getAttribute('aria-disabled')).toBe('true');
+  expect(screen.getByRole('button',{name:'Dismiss…'})).toHaveProperty('disabled',false);
   expect(screen.getByText(/The original finding type is unavailable/)).toBeTruthy();
   await act(async()=>{});
 });
@@ -62,7 +72,7 @@ it('returns a deleted replacement to pending and cancels re-creation without sav
   view.draft.reanchor_resolutions=[{item:{proposal_set_id:4,source_ref:pending.source_ref},outcome:'recreated',replacement:{annotation_id:'deleted-copy',version:'gone'},reviewer_id:'alice'}];
   const apply=vi.spyOn(api,'applyCommand'),resolve=vi.spyOn(api,'resolveReanchor');
   render(<CaseScreen view={view} workspaceId="w" onClose={()=>{}}/>);
-  fireEvent.click(screen.getByRole('button',{name:'Re-create here'}));
+  fireEvent.click(screen.getByRole('button',{name:'Mark in text'}));
   await screen.findByText(/Select supporting text to re-create HP:1/);
   selectCurrentText();
   await screen.findByRole('heading',{name:'Re-create finding on corrected text'});
@@ -86,16 +96,14 @@ it('retains a failed re-creation, then resolves only the exact saved replacement
     stored={...stored,revision:2,reanchor_resolutions:[{...payload,outcome:'recreated',reviewer_id:'alice'}]};return stored;
   });
   render(<CaseScreen view={view} workspaceId="w" onClose={()=>{}}/>);
-  fireEvent.click(screen.getByRole('button',{name:'Re-create here'}));await screen.findByText(/Select supporting text to re-create HP:1/);selectCurrentText();
+  fireEvent.click(screen.getByRole('button',{name:'Mark in text'}));await screen.findByText(/Select supporting text to re-create HP:1/);selectCurrentText();
   fireEvent.click(await screen.findByRole('button',{name:'Save re-created finding'}));
   await screen.findByText('Cannot save this finding');expect(resolve).not.toHaveBeenCalled();
   expect(screen.getByRole('heading',{name:'Re-create finding on corrected text'})).toBeTruthy();
+  // Without values to check, saving completes the text-change review in the same step (#633).
   fireEvent.click(screen.getByRole('button',{name:'Save re-created finding'}));
-  await screen.findByRole('button',{name:'Complete text-change review'});
-  expect(resolve).not.toHaveBeenCalled();
-  expect(screen.getByText('1 pending, 0 resolved')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button',{name:'Complete text-change review'}));
   await screen.findByText('Re-created');
+  expect(screen.queryByRole('button',{name:'Complete text-change review'})).toBeNull();
   expect(apply).toHaveBeenLastCalledWith('w',expect.objectContaining({payload:expect.objectContaining({command:'recreate_reanchor',item:{proposal_set_id:pending.proposal_set_id,source_ref:pending.source_ref},term_id:'HP:1',layer_id:'phenotype',segments:[{start:2,end:6}]})}));
   expect(resolve).toHaveBeenCalledWith('w',expect.objectContaining({expected_revision:1,payload:expect.objectContaining({outcome:'recreated',replacement:{annotation_id:stored.annotations![0].annotation.annotation_id,version:'saved-version'}})}));
   expect(screen.getByText('0 pending, 1 resolved')).toBeTruthy();
@@ -118,7 +126,7 @@ it('reuses a saved edited finding and explicitly pins its current version withou
   fireEvent.blur(screen.getByRole('textbox',{name:'Note'}));
   await screen.findByText('1 pending, 0 resolved');
   expect(screen.getByText('1 pending, 0 resolved')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button',{name:'Re-create here'}));
+  fireEvent.click(screen.getByRole('button',{name:'Mark in text'}));
   fireEvent.click(await screen.findByRole('button',{name:'Complete text-change review'}));
   await screen.findByText('Link failed');expect(apply).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole('button',{name:'Complete text-change review'}));
@@ -139,11 +147,10 @@ it('retains the saved replacement after a resolution failure and retries linking
     return {...saved,revision:2,reanchor_resolutions:[{...payload,reviewer_id:'alice'}]};
   });
   render(<CaseScreen view={view} workspaceId="w" onClose={()=>{}}/>);
-  fireEvent.click(screen.getByRole('button',{name:'Re-create here'}));await screen.findByText(/Select supporting text to re-create HP:1/);selectCurrentText();
+  fireEvent.click(screen.getByRole('button',{name:'Mark in text'}));await screen.findByText(/Select supporting text to re-create HP:1/);selectCurrentText();
   fireEvent.click(await screen.findByRole('button',{name:'Save re-created finding'}));
-  fireEvent.click(await screen.findByRole('button',{name:'Complete text-change review'}));
   await screen.findByText('Resolution failed');expect(apply).toHaveBeenCalledTimes(1);
-  fireEvent.click(screen.getByRole('button',{name:'Complete text-change review'}));
+  fireEvent.click(screen.getByRole('button',{name:'Save re-created finding'}));
   await screen.findByText('0 pending, 1 resolved');expect(apply).toHaveBeenCalledTimes(1);expect(resolve).toHaveBeenCalledTimes(2);
 });
 it('does not select an arbitrary replacement when multiple exact-source copies exist',async()=>{
@@ -152,7 +159,7 @@ it('does not select an arbitrary replacement when multiple exact-source copies e
   const second=structuredClone(first);second.annotation.annotation_id='other-copy';
   view.draft.annotations=[first,second];const apply=vi.spyOn(api,'applyCommand'),resolve=vi.spyOn(api,'resolveReanchor');
   render(<CaseScreen view={view} workspaceId="w" onClose={()=>{}}/>);
-  fireEvent.click(screen.getByRole('button',{name:'Re-create here'}));
+  fireEvent.click(screen.getByRole('button',{name:'Mark in text'}));
   await screen.findByText('Select the replacement finding in the findings list, then choose Complete text-change review.');
   expect(screen.queryByRole('button',{name:'Complete text-change review'})).toBeNull();
   expect(screen.queryByRole('heading',{name:'Re-create finding on corrected text'})).toBeNull();
@@ -163,9 +170,9 @@ it('restores reviewer-specific dismissal audit after reload and hides actions in
   const next:Draft={...view.draft,revision:1,reanchor_resolutions:[{item:{proposal_set_id:pending.proposal_set_id,source_ref:pending.source_ref},outcome:'dismissed',reason:'No longer supported',reviewer_id:'alice'}]};
   const resolve=vi.spyOn(api,'resolveReanchor').mockResolvedValue(next);
   const mounted=render(<CaseScreen view={view} workspaceId="w" onClose={()=>{}}/>);
-  fireEvent.click(screen.getByRole('button',{name:'Re-create here'}));await screen.findByText(/Select supporting text to re-create HP:1/);selectCurrentText();
+  fireEvent.click(screen.getByRole('button',{name:'Mark in text'}));await screen.findByText(/Select supporting text to re-create HP:1/);selectCurrentText();
   await screen.findByRole('heading',{name:'Re-create finding on corrected text'});
-  fireEvent.click(screen.getByRole('button',{name:'Dismiss with reason'}));
+  fireEvent.click(screen.getByRole('button',{name:'Dismiss…'}));
   fireEvent.change(screen.getByRole('textbox',{name:/Reason for dismissal/}),{target:{value:'No longer supported'}});
   fireEvent.click(screen.getByRole('button',{name:'Save dismissal'}));
   await screen.findByText('Dismissed');expect(resolve).toHaveBeenCalledWith('w',expect.objectContaining({payload:{item:{proposal_set_id:4,source_ref:pending.source_ref},outcome:'dismissed',reason:'No longer supported'}}));
@@ -173,7 +180,7 @@ it('restores reviewer-specific dismissal audit after reload and hides actions in
   mounted.unmount();render(<CaseScreen view={{...view,draft:next}} workspaceId="w" onClose={()=>{}} readOnly/>);
   await act(async()=>{});
   expect(screen.getByText('Reviewed by alice: No longer supported')).toBeTruthy();
-  expect(screen.queryByRole('button',{name:'Re-create here'})).toBeNull();expect(screen.queryByRole('button',{name:'Dismiss with reason'})).toBeNull();
+  expect(screen.queryByRole('button',{name:'Mark in text'})).toBeNull();expect(screen.queryByRole('button',{name:'Dismiss…'})).toBeNull();
 });
 it('uses inline actual-workspace offered metadata without ordinary public prefetch and never loads annotate pending inventory',async()=>{
   const view=workspaceFixture('target').view;
@@ -216,7 +223,7 @@ it('blocks submission for an invalidated frozen reanchor resolution and focuses 
   view.draft.reanchor_resolutions=[{item:{proposal_set_id:pending.proposal_set_id,source_ref:pending.source_ref},outcome:'recreated',replacement:{annotation_id:'deleted',version:'old'},reviewer_id:'alice'}];
   const submit=vi.spyOn(api,'submitWorkspace');
   render(<CaseScreen view={view} workspaceId="reanchor-submit" onClose={()=>{}}/>);
-  const disclosure = screen.getByRole('button', {name:'HP:1, phenotype'}).closest('details')!;
+  const disclosure = screen.getByRole('button', {name:'HP:1'}).closest('details')!;
   disclosure.open = false;
   fireEvent.click(screen.getByRole('button',{name:/Finish & submit/}));
   const dialog=await screen.findByRole('dialog',{name:'Submit text'});
@@ -224,7 +231,38 @@ it('blocks submission for an invalidated frozen reanchor resolution and focuses 
   expect(within(dialog).getByText('Re-create or dismiss 1 finding after text correction before submitting.')).toBeTruthy();
   expect(within(dialog).getByRole('button',{name:'Submit text'}).getAttribute('aria-disabled')).toBe('true');
   fireEvent.click(within(dialog).getAllByRole('button',{name:/^Go to /})[0]);
-  await waitFor(()=>expect(screen.getByRole('button',{name:'HP:1, phenotype'})).toBe(document.activeElement));
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Mark in text'})).toBe(document.activeElement));
   expect(disclosure.open).toBe(true);
   expect(submit).not.toHaveBeenCalled();
+});
+
+it('re-creates a finding at its suggested place with one click and moves on to the next pending item',async()=>{
+  const {view,pending}=editableReanchor();
+  const place=[{start:2,end:6,text:'😀new'}];
+  const first={...pending,suggestions:[place]}, second=item({proposal_set_id:5,layer_id:'phenotype',new_context:pending.new_context,suggestions:[place]});
+  view.pending_reanchor_items=[first,second];
+  view.draft.reanchor_inputs=[first,second].map(value=>({proposal_set_id:value.proposal_set_id,source_ref:value.source_ref}));
+  let stored=structuredClone(view.draft);
+  const apply=vi.spyOn(api,'applyCommand').mockImplementation(async(_id,envelope)=>{
+    const payload=envelope.payload as {annotation_id:string;term_id:string};
+    const annotation=structuredClone(historical.annotations[0]);annotation.version='saved-version';
+    Object.assign(annotation.annotation,{annotation_id:payload.annotation_id,term_id:payload.term_id});
+    annotation.annotation.provenance.source_refs=[`${first.source_ref.annotation_id}:${first.source_ref.version}`];
+    stored={...stored,revision:stored.revision+1,annotations:[...(stored.annotations??[]),annotation]};return stored;
+  });
+  const resolve=vi.spyOn(api,'resolveReanchor').mockImplementation(async(_id,envelope)=>{
+    const payload=envelope.payload as NonNullable<Draft['reanchor_resolutions']>[number];
+    stored={...stored,revision:stored.revision+1,reanchor_resolutions:[...(stored.reanchor_resolutions??[]),{...payload,reviewer_id:'alice'}]};return stored;
+  });
+  const mounted=render(<CaseScreen view={view} workspaceId="w" onClose={()=>{}}/>);
+  expect(mounted.container.querySelectorAll('.app-layout > .center-pane .run--pending')).not.toHaveLength(0);
+  fireEvent.click(screen.getAllByRole('button',{name:'Use this location'})[0]);
+  await screen.findByText('1 pending, 1 resolved');
+  expect(apply).toHaveBeenCalledTimes(1);
+  expect(apply).toHaveBeenLastCalledWith('w',expect.objectContaining({payload:expect.objectContaining({command:'recreate_reanchor',
+    item:{proposal_set_id:first.proposal_set_id,source_ref:first.source_ref},term_id:'HP:1',segments:[{start:2,end:6}]})}));
+  expect(resolve).toHaveBeenCalledWith('w',expect.objectContaining({payload:expect.objectContaining({outcome:'recreated',item:{proposal_set_id:4,source_ref:first.source_ref}})}));
+  // The next pending item is selected and its primary action has the focus.
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Use this location'})).toBe(document.activeElement));
+  expect(document.activeElement?.closest('[data-reanchor-item]')?.getAttribute('aria-current')).toBe('true');
 });

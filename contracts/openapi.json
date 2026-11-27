@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Ontotator Local API",
-    "version": "0.14.0"
+    "version": "0.15.0"
   },
   "paths": {
     "/api/v1/me/tasks": {
@@ -2835,6 +2835,60 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CheckedSentences"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-ontotator-scope": "session"
+      }
+    },
+    "/api/v1/translation-reviews/{assignment_id}/segment-pairs": {
+      "put": {
+        "tags": [
+          "translation-reviews"
+        ],
+        "summary": "Save Segment Pairs",
+        "description": "The reviewer's own segment pairs and their checks; not part of the review.\n\nWith ``base`` (the pairs this tab last had), checks saved meanwhile in another\ntab stay. The answer is what is stored.",
+        "operationId": "save_segment_pairs_api_v1_translation_reviews__assignment_id__segment_pairs_put",
+        "parameters": [
+          {
+            "name": "assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Assignment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentPairsSave"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentPairs"
                 }
               }
             }
@@ -23844,6 +23898,13 @@
             ],
             "title": "Reason"
           },
+          "missing_languages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Languages"
+          },
           "reviewed_again": {
             "type": "boolean",
             "title": "Reviewed Again"
@@ -23876,6 +23937,7 @@
           "translation_status",
           "available",
           "reason",
+          "missing_languages",
           "reviewed_again",
           "review_on",
           "annotate_accepted_only",
@@ -29711,6 +29773,26 @@
             "type": "array",
             "title": "Diff"
           },
+          "suggestions": {
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/TextWindowView"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          },
+          "changed_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextWindowView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "old_segments": {
             "items": {
               "$ref": "#/components/schemas/TextWindowView"
@@ -30658,6 +30740,16 @@
           },
           "checked_sentences": {
             "$ref": "#/components/schemas/CheckedSentences"
+          },
+          "segment_pairs": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SegmentPairs"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "version_origin": {
             "anyOf": [
@@ -32363,6 +32455,140 @@
         ],
         "title": "Segment",
         "description": "Zero-based Unicode codepoint interval [start, end)."
+      },
+      "SegmentPair": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/SegmentSpan"
+          },
+          "translation": {
+            "$ref": "#/components/schemas/SegmentSpan"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "aligner",
+              "manual",
+              "pipeline"
+            ],
+            "title": "Origin",
+            "default": "aligner"
+          },
+          "checked": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:[0-9a-f]{8}|stale)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "translation"
+        ],
+        "title": "SegmentPair",
+        "description": "One aligned pair: a passage of the source and the passage of the translation.\n\n``checked`` is the hash of the pair's translation when the reviewer checked it,\nor ``stale`` for a pair joined from a partly checked one; the client compares it\nwith the hash of the passage now. ``origin`` says where the pair comes from:\n``aligner`` (the rule-based aligner of the browser), ``manual`` (made or changed\nby the reviewer: a merge, a split, later pairing by hand) or ``pipeline`` (the\ntranslation pipeline's alignment, not supplied yet). All three are accepted and\nstored as they are, so pairs of the later sources need no data migration; any\nother value is refused."
+      },
+      "SegmentPairs": {
+        "properties": {
+          "source_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}$",
+            "title": "Source Hash"
+          },
+          "text_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}$",
+            "title": "Text Hash"
+          },
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentPair"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "title": "Pairs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_hash",
+          "text_hash"
+        ],
+        "title": "SegmentPairs",
+        "description": "The reviewer's alignment of the source and the draft text, with its checks.\n\n``source_hash`` and ``text_hash`` name the texts the passages refer to; a client\nthat finds other texts aligns them anew."
+      },
+      "SegmentPairsSave": {
+        "properties": {
+          "source_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}$",
+            "title": "Source Hash"
+          },
+          "text_hash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}$",
+            "title": "Text Hash"
+          },
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/SegmentPair"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "title": "Pairs"
+          },
+          "base": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SegmentPairs"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_hash",
+          "text_hash"
+        ],
+        "title": "SegmentPairsSave",
+        "description": "New pairs, optionally with the pairs they were made from.\n\nWith ``base``, a save does not undo what another tab saved meanwhile: when both\ntabs refer to the same texts, the checks this tab changed since ``base`` are\napplied, and the checks the other tab changed are kept (see\n``merged_segment_pairs``). Without ``base``, the new pairs replace the stored ones."
+      },
+      "SegmentSpan": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "maximum": 10000000.0,
+            "minimum": 0.0,
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "maximum": 10000000.0,
+            "minimum": 0.0,
+            "title": "End"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "SegmentSpan",
+        "description": "A passage of one text, in UTF-16 code units as the browser counts them."
       },
       "SelectedRowsRequest": {
         "properties": {

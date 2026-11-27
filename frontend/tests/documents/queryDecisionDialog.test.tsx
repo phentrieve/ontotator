@@ -76,7 +76,7 @@ it("the lead may change the reviewer's text; the version's own text is not a new
   // Back at the version's text: nothing to save, and the other option is named.
   vi.mocked(api.decideQuery).mockClear();
   fireEvent.change(editor, { target: { value: OLD } });
-  expect(within(dialog).getByText("This text is the same as v1. To accept v1 without changes, use Accept v1 as it is….")).toBeTruthy();
+  expect(within(dialog).getByText("This text is the same as v1. To accept v1 without changes, use Accept v1 as it is…")).toBeTruthy();
   expect(within(dialog).queryByRole("region", { name: "Text changes" })).toBeNull();
   const accept = within(dialog).getByRole("button", { name: "Accept as v2" });
   expect(accept.getAttribute("aria-disabled")).toBe("true");

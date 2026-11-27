@@ -34,15 +34,18 @@ def text_mode(
     plan_override: AnnotationMode | None,
     proposal_count: int,
     work_modes: Iterable[AnnotationMode],
+    review_items: bool = False,
 ) -> TextMode:
     """``work_modes``: modes of the text's annotation work, oldest first
     (non-revoked annotate assignments, revoked ones with submitted work, and
     annotation submissions; plan "Pure rule" 1). ``proposal_count`` counts
-    the newest proposal set of the text's target document."""
+    the newest proposal set of the text's target document; ``review_items``
+    whether that document has needs-review items of a re-anchored set (#650),
+    which are work from proposals even when the set has no proposal left."""
     work = list(work_modes)
     if work:
         return TextMode(work[0], "locked", True)
-    if proposal_count == 0:
+    if proposal_count == 0 and not review_items:
         return TextMode("scratch", "no_proposals", False)
     if plan_override is not None:
         return TextMode(plan_override, "plan", False)

@@ -5,6 +5,7 @@ import { FilterChip } from "../ui/FilterChip";
 import { InlineMessage } from "../ui/InlineMessage";
 import { Kbd } from "../ui/Kbd";
 import { useShortcutHint } from "../ui/shortcuts";
+import { useTouchOnly } from "../ui/useMediaQuery";
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { SearchCandidate } from "../api/client";
 import { SearchLanguageButton } from "./SearchLanguageButton";
@@ -84,6 +85,8 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
 }) => {
   const showTermId = useTermIdDisplay();
   const [modifiersOnly, setModifiersOnly] = useState(false);
+  // Touch: the hint says "tap", and a finger that scrolls the list does not make the hit under it active (issue 612).
+  const touchOnly = useTouchOnly();
   // "Modifiers only" switched on by the `mod:` prefix: an emptied field switches it off again.
   const modifiersFromPrefix = useRef(false);
   const offerModifierFilter = modifierFilter && mode === "finding";
@@ -393,7 +396,8 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
           ) : expanded ? (
             anyUsable ? (
               <>
-                {hitCount}, {shownActive < 0 && "no close match, "}<Kbd>↓</Kbd><Kbd>↑</Kbd> choose, <Kbd>Enter</Kbd> add, <Kbd>Esc</Kbd> cancel
+                {hitCount}, {shownActive < 0 && "no close match, "}{touchOnly ? "tap a term to add it"
+                  : <><Kbd>↓</Kbd><Kbd>↑</Kbd> choose, <Kbd>Enter</Kbd> add, <Kbd>Esc</Kbd> cancel</>}
               </>
             ) : (
               hitCount
@@ -428,7 +432,9 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                 className={`candidate-card${cand.obsolete ? " candidate-obsolete" : ""}`}
                 // Keep the focus in the field: the hits are options of the combobox, not buttons.
                 onMouseDown={(event) => event.preventDefault()}
-                onPointerEnter={() => {
+                onPointerEnter={(event) => {
+                  // A finger that starts a swipe on a hit only scrolls the list: the active hit stays (issue 612).
+                  if (event.pointerType === "touch") return;
                   // A pointer resting where the list appears must not arm a weak match for Enter.
                   if (usable && !isActive && !cand.weak_match) setActive({ list: state.candidates, index });
                 }}

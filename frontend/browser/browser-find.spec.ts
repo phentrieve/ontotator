@@ -7,6 +7,8 @@
  * - Show changes: deleted words are generated content, so `Dosis 5 mg` → `Dosis 10 mg` is found as "Dosis 10 mg"
  *   and never as "Dosis 510 mg". The deleted words still show and are still read out as deletions.
  * - The source, the comparison and the annotation editor's text are found once per occurrence.
+ * - Mark checked sentences: the text is selectable, so every hit is selected and the walk steps through all of
+ *   them, in the source and the translation; with Show changes on as well, the proposed text is found.
  */
 import { expect, test, type Page } from '@playwright/test';
 import { loginExisting } from './helpers';
@@ -36,7 +38,8 @@ function findHits(page: Page, needle: string): Promise<string[]> {
         where = element?.closest('.translation-editor-mirror') ? 'mirror'
           : element?.closest('[role="region"][aria-label]')?.getAttribute('aria-label')
             ?? (element?.closest('.text-container') ? 'annotation text' : 'page');
-        found = selection.toString(); at = `${selection.anchorOffset}:${node?.textContent?.slice(0, 40)}`;
+        // A sentence's start can repeat ("Dose 5 mg."), so its index is part of where a hit is.
+        found = selection.toString(); at = `${selection.anchorOffset}:${element?.closest('[data-sentence]')?.getAttribute('data-sentence') ?? ''}:${node?.textContent?.slice(0, 40)}`;
         // A hit in unselectable text (the old mirror was `user-select: none`) selects nothing: Chromium still
         // counts it in the find bar ("1 of 2") but cannot show where it is.
         if (!found) where = 'unselectable';
@@ -109,6 +112,35 @@ test('find counts each passage of the translation once, matches the proposed tex
   const hits = await findHits(page, phrase);
   expect(hits.filter(hit => hit.startsWith('Comparison:'))).toHaveLength(expected);
   expect(hits.filter(hit => hit.startsWith('mirror:') || hit.startsWith('unselectable:'))).toEqual([]);
+});
+
+test('find selects and steps through every hit while marking checked sentences, also with Show changes', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const s = await openReview(page);
+  await page.getByRole('checkbox', { name: 'Mark checked sentences', exact: true }).check();
+  const translation = page.getByRole('region', { name: 'Translation (de)', exact: true });
+  await expect(translation.locator('[data-sentence]').first()).toBeVisible();
+  const count = (text: string, phrase: string) => text.split(phrase).length - 1;
+  const phrase = 'Dosis', sourcePhrase = 'Dose';
+  expect(count(s.texts.target, phrase)).toBeGreaterThan(1);
+  const hits = await findHits(page, phrase);
+  expect(hits).toEqual(Array.from({ length: count(s.texts.target, phrase) }, () => `Translation (de):${phrase}`));
+  // "Dose" also stands in the case id outside the texts; only the source column's hits are counted here.
+  const sourceHits = await findHits(page, sourcePhrase);
+  expect(sourceHits.filter(hit => hit.startsWith('Source (en):'))).toEqual(Array.from({ length: count(s.texts.source, sourcePhrase) }, () => `Source (en):${sourcePhrase}`));
+  // A find hit is a selection, not a mark.
+  await expect(translation.locator('[aria-pressed="true"]')).toHaveCount(0);
+
+  // Show changes while marking: the changes stand in the sentences, and find matches the proposed text.
+  await page.getByRole('checkbox', { name: 'Mark checked sentences', exact: true }).uncheck();
+  const edited = s.texts.target.replace('Absatz 3. Dosis 5 mg', 'Absatz 3. Dosis 10 mg');
+  await page.getByRole('textbox', { name: 'Translation (de)', exact: true }).fill(edited);
+  await page.getByRole('checkbox', { name: 'Show changes', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'Mark checked sentences', exact: true }).check();
+  await expect(translation.locator('[data-sentence] ins').filter({ hasText: /^10$/ })).toHaveCount(1);
+  await expect(translation.locator('[data-sentence] del [data-text="5"]')).toHaveCount(1);
+  expect(await findHits(page, 'Absatz 3. Dosis 10 mg')).toEqual(['Translation (de):Absatz 3. Dosis 10 mg']);
+  expect(await findHits(page, 'Dosis 510 mg')).toEqual([]);
 });
 
 test('find counts each passage of the annotation editor text once', async ({ page }) => {
