@@ -486,7 +486,11 @@ def build_readme(
             "agreement.csv compares, per text, the annotations of every two "
             "people that the bundles hold, with ontospan's matching: strict needs "
             "the same passage, tolerant an overlapping one; term_f1 compares the "
-            "terms with their values. Span annotation has no countable negatives, "
+            "terms with their values. annotation_hierarchical_f1 is the tolerant "
+            "value in which a pair of a parent and a child term (at any distance "
+            "in the pinned ontology release) with the same values on overlapping "
+            "text counts half a match; sibling terms count nothing. Span "
+            "annotation has no countable negatives, "
             "so only F1 values are given, no kappa. modifier_agreement is the "
             "share of matched findings with the same modifiers. mode_a and mode_b "
             'are "scratch" (annotation from scratch) or "proposals" (annotation '
@@ -503,7 +507,12 @@ def build_readme(
             "the same per passage (mentions_*) and per term (terms_*), "
             "modifiers_compared (matched findings) with modifiers_agreeing, and "
             "related_term_conflicts: the term_conflicts whose terms are ancestor "
-            "and descendant in the ontology (a flag; no F1 value uses it).",
+            "and descendant in the ontology, whatever their values (a flag), and "
+            "hierarchy_credited: those of them with the same values, each "
+            "counting 0.5 in annotation_hierarchical_f1, so "
+            "annotation_hierarchical_f1 = 2 x (equal + compatible + 0.5 x "
+            "hierarchy_credited) / (findings_a + findings_b); another weight can "
+            "be computed from the same counts.",
             "- ",
             "  ",
         ),

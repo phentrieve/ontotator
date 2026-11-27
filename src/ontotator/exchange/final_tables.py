@@ -20,9 +20,10 @@ import io
 import re
 import zipfile
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, fields
 from itertools import combinations
+from pathlib import Path
 from statistics import fmean
 from typing import Any
 
@@ -67,6 +68,8 @@ FINDINGS_TAIL = (
 F1_COLUMNS = (
     "annotation_strict_f1",
     "annotation_tolerant_f1",
+    # Tolerant, with HIERARCHY_CREDIT for each hierarchy_credited pair (#600).
+    "annotation_hierarchical_f1",
     "mention_strict_f1",
     "mention_tolerant_f1",
     "term_f1",
@@ -90,10 +93,16 @@ COUNT_COLUMNS = (
     "terms_equal",
     "modifiers_compared",
     "modifiers_agreeing",
-    # Of ``term_conflicts``: the terms are ancestor and descendant (#303).
-    # A flag only; no F1 value uses it.
+    # Of ``term_conflicts``: the terms are ancestor and descendant (#303),
+    # whatever their values. A flag only; no F1 value uses it.
     "related_term_conflicts",
+    # Of ``related_term_conflicts``: those with the same values (axes); each
+    # counts HIERARCHY_CREDIT in annotation_hierarchical_f1 (#600).
+    "hierarchy_credited",
 )
+HIERARCHY_CREDIT = 0.5
+"""What a parent/child pair with the same values counts in
+annotation_hierarchical_f1, at any distance; siblings count nothing (#636)."""
 AGREEMENT_COLUMNS = (
     "case_id",
     "language",
@@ -221,7 +230,7 @@ def _ratio(part: int, whole: int) -> float | None:
     return part / whole if whole else None
 
 
-def _f1(agreeing: int, n_a: int, n_b: int) -> float:
+def _f1(agreeing: float, n_a: int, n_b: int) -> float:
     # As ontospan.matching: two empty sets agree. Only for counts of at least
     # one pair; without pairs there is nothing to agree (agreement_summary).
     return 1.0 if n_a + n_b == 0 else 2 * agreeing / (n_a + n_b)
@@ -458,24 +467,78 @@ def _related_term_conflicts(
     """Term conflicts of the pairing ``ontospan.agreement`` makes whose terms
     are ancestor and descendant in the layer's ontology (#303). The pairing is
     per layer, so matching per layer with its ontology gives the same pairs."""
+    return sum(
+        sum(
+            group.ancestor
+            for group in ontospan.match_annotations(left, right, text, ontology)
+        )
+        for left, right, ontology in _per_layer(a, b, layers, ontology_of)
+    )
+
+
+def _hierarchy_credited(
+    a: Sequence[ontospan.Annotation],
+    b: Sequence[ontospan.Annotation],
+    text: str,
+    layers: Mapping[str, ontospan.Layer],
+    ontology_of: OntologyOf | None,
+) -> int | None:
+    """The related term conflicts with the same values (axes), ontospan's
+    ``related`` per layer (#600); None without ontologies to look up."""
     if ontology_of is None:
-        return 0
-    related = 0
+        return None
+    return sum(
+        ontospan.agreement(left, right, text, ontology).related or 0
+        for left, right, ontology in _per_layer(a, b, layers, ontology_of)
+    )
+
+
+def _per_layer(
+    a: Sequence[ontospan.Annotation],
+    b: Sequence[ontospan.Annotation],
+    layers: Mapping[str, ontospan.Layer],
+    ontology_of: OntologyOf | None,
+) -> Iterator[
+    tuple[list[ontospan.Annotation], list[ontospan.Annotation], ontospan.OntologyView]
+]:
+    """Both sides' findings of each layer they share that has an ontology."""
+    if ontology_of is None:
+        return
     for layer_id in sorted({x.layer_id for x in a} & {y.layer_id for y in b}):
         layer = layers.get(layer_id)
         ontology = ontology_of(layer) if layer is not None else None
-        if ontology is None:
-            continue
-        related += sum(
-            group.ancestor
-            for group in ontospan.match_annotations(
+        if ontology is not None:
+            yield (
                 [x for x in a if x.layer_id == layer_id],
                 [y for y in b if y.layer_id == layer_id],
-                text,
                 ontology,
             )
-        )
-    return related
+
+
+def _hierarchical_f1(counts: Mapping[str, int]) -> float:
+    return _f1(
+        counts["equal"]
+        + counts["compatible"]
+        + HIERARCHY_CREDIT * counts["hierarchy_credited"],
+        counts["findings_a"],
+        counts["findings_b"],
+    )
+
+
+def ontology_loader(path_of: Callable[[str], Path]) -> OntologyOf:
+    """An ``OntologyOf`` that loads each pinned release (by its blob digest)
+    once per call site."""
+    views: dict[str, ontospan.OntologyView] = {}
+
+    def ontology_of(layer: ontospan.Layer) -> ontospan.OntologyView | None:
+        digest = layer.ontology.sha256
+        if digest is None:
+            return None
+        if digest not in views:
+            views[digest] = ontospan.ObographOntology.load(path_of(digest))
+        return views[digest]
+
+    return ontology_of
 
 
 def _base_layers(*items: ExportedUnit) -> dict[str, ontospan.Layer]:
@@ -488,7 +551,11 @@ def _base_layers(*items: ExportedUnit) -> dict[str, ontospan.Layer]:
 
 
 def _counts(
-    found: ontospan.Agreement, findings_a: int, findings_b: int, related: int = 0
+    found: ontospan.Agreement,
+    findings_a: int,
+    findings_b: int,
+    related: int = 0,
+    credited: int = 0,
 ) -> dict[str, int]:
     compared = found.equal + found.compatible
     return {
@@ -510,6 +577,7 @@ def _counts(
         "modifiers_compared": compared,
         "modifiers_agreeing": round((found.modifier_agreement or 0.0) * compared),
         "related_term_conflicts": related,
+        "hierarchy_credited": credited,
     }
 
 
@@ -524,6 +592,7 @@ def _pooled(counts: Mapping[str, int]) -> dict[str, float | None]:
             counts["findings_a"],
             counts["findings_b"],
         ),
+        "annotation_hierarchical_f1": _hierarchical_f1(counts),
         "mention_strict_f1": _f1(
             counts["mentions_equal"], counts["mentions_a"], counts["mentions_b"]
         ),
@@ -588,21 +657,25 @@ def agreement_pairs(
             a, b = own_findings(context, left), own_findings(context, right)
             text = left.unit.document.text
             found = ontospan.agreement(a, b, text)
-            related = _related_term_conflicts(
-                a, b, text, _base_layers(left, right), ontology_of
-            )
+            layers = _base_layers(left, right)
+            related = _related_term_conflicts(a, b, text, layers, ontology_of)
+            credited = _hierarchy_credited(a, b, text, layers, ontology_of)
+            counts = _counts(found, len(a), len(b), related, credited or 0)
             values = {
                 f.name: getattr(found, f.name)
                 for f in fields(found)
                 if f.name in F1_COLUMNS
             }
+            values["annotation_hierarchical_f1"] = (
+                None if credited is None else _hierarchical_f1(counts)
+            )
             pairs.append(
                 AgreementPair(
                     document_id,
                     left.submission_id,
                     right.submission_id,
                     values,
-                    _counts(found, len(a), len(b), related),
+                    counts,
                     _mode(context, left.submission_id),
                     _mode(context, right.submission_id),
                 )
@@ -634,6 +707,10 @@ def agreement_summary(pairs: Sequence[AgreementPair]) -> dict[str, dict[str, Any
         for group in texts.values()
     ]
     totals = {name: sum(pair.counts[name] for pair in pairs) for name in COUNT_COLUMNS}
+    pooled = _pooled(totals) if pairs else dict.fromkeys(F1_COLUMNS)
+    if any(pair.values["annotation_hierarchical_f1"] is None for pair in pairs):
+        # Some pair had no ontology to look the hierarchy up in.
+        pooled["annotation_hierarchical_f1"] = None
     size = {"texts": len(texts), "pairs": len(pairs)}
     return {
         "macro_mean": {
@@ -649,7 +726,7 @@ def agreement_summary(pairs: Sequence[AgreementPair]) -> dict[str, dict[str, Any
         },
         "pooled": {
             **size,
-            **(_pooled(totals) if pairs else dict.fromkeys(F1_COLUMNS)),
+            **pooled,
             **totals,
         },
     }
@@ -700,7 +777,9 @@ def build_agreement_csv(
 
 
 def agreement_report(
-    payload: Mapping[str, Any], units: Sequence[ExportedUnit]
+    payload: Mapping[str, Any],
+    units: Sequence[ExportedUnit],
+    ontology_of: OntologyOf | None = None,
 ) -> dict[str, Any]:
     """The agreement tables as data (the project agreement route, #353).
 
@@ -708,7 +787,7 @@ def agreement_report(
     agreement-summary.csv, unrounded; ``annotator_pairs`` and ``texts`` apply
     the same summary to the pairs of two people and to the pairs of one text.
     """
-    pairs = agreement_pairs(payload, units) if units else []
+    pairs = agreement_pairs(payload, units, ontology_of) if units else []
     context = SubmissionFacts(payload) if pairs else None
 
     def text(pair: AgreementPair) -> dict[str, str]:

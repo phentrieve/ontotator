@@ -134,6 +134,9 @@ def test_agreement_compares_the_two_annotations_behind_the_result(consolidated):
     assert pair["a_only"] == "0" and pair["b_only"] == "1"
     # Status epilepticus and Dialeptic seizure are siblings, not related (#303).
     assert pair["related_term_conflicts"] == "0"
+    # So nothing is credited and the hierarchical value is the tolerant one (#600).
+    assert pair["hierarchy_credited"] == "0"
+    assert pair["annotation_hierarchical_f1"] == pair["annotation_tolerant_f1"]
     assert pair["annotation_strict_f1"] == f"{2 / 7:.4f}"
     summary = all_pairs_summary(archive)
     assert set(summary) == {"macro_mean", "pooled"}
@@ -716,3 +719,65 @@ def test_related_term_conflicts_flag_parent_and_child_terms_only():
     assert _related_term_conflicts(a, b, text, layers, None) == 0
     assert _related_term_conflicts(a, b, text, layers, lambda _layer: None) == 0
     assert "related_term_conflicts" in COUNT_COLUMNS
+
+
+def test_hierarchy_credits_parent_and_child_with_the_same_values_half():
+    """#600 / #636: Seizure / Status epilepticus (ancestor and descendant, same
+    values) count half a match; Hypotonia / Areflexia (siblings) nothing; the
+    same parent/child pair with another assertion nothing either."""
+    from t1_fixtures import HP_PATH
+
+    from ontotator.exchange.final_tables import (
+        HIERARCHY_CREDIT,
+        _hierarchy_credited,
+        _related_term_conflicts,
+    )
+
+    text = "Seizures and weak tone."
+    a = [
+        _spanned("a1", "HP:0001250", text, "Seizures"),
+        _spanned("a2", "HP:0001252", text, "weak tone"),
+    ]
+    b = [
+        _spanned("b1", "HP:0002133", text, "Seizures"),
+        _spanned("b2", "HP:0001284", text, "weak tone"),
+    ]
+    view = ontospan.ObographOntology.load(HP_PATH)
+    layers: Any = {"hpo": object()}
+    assert HIERARCHY_CREDIT == 0.5
+    assert _hierarchy_credited(a, b, text, layers, lambda _layer: view) == 1
+    # Without ontologies the hierarchy is unknown, not zero.
+    assert _hierarchy_credited(a, b, text, layers, None) is None
+    assert _hierarchy_credited(a, b, text, layers, lambda _layer: None) == 0
+    absent = {"assertion": ontospan.models.AxisValue(value="absent", basis="chosen")}
+    other = [b[0].model_copy(update={"axes": absent}), b[1]]
+    assert _related_term_conflicts(a, other, text, layers, lambda _l: view) == 1
+    assert _hierarchy_credited(a, other, text, layers, lambda _l: view) == 0
+    assert "hierarchy_credited" in COUNT_COLUMNS
+    assert "annotation_hierarchical_f1" in F1_COLUMNS
+
+
+def test_hierarchical_f1_pools_the_credited_pairs_and_needs_every_ontology():
+    counts = dict.fromkeys(COUNT_COLUMNS, 0) | {
+        "findings_a": 6,
+        "findings_b": 6,
+        "equal": 1,
+        "term_conflicts": 4,
+        "related_term_conflicts": 3,
+        "hierarchy_credited": 3,
+        "a_only": 1,
+        "b_only": 1,
+    }
+    values = dict.fromkeys(F1_COLUMNS, 0.0) | {"annotation_hierarchical_f1": 0.0}
+    pair = AgreementPair("t1", "a", "b", values, counts)
+    # The worked example of the design note: 2 x (1 + 0.5 x 3) / 12.
+    pooled = agreement_summary([pair])["pooled"]
+    assert pooled["annotation_hierarchical_f1"] == pytest.approx(2 * 2.5 / 12)
+    assert pooled["annotation_tolerant_f1"] == pytest.approx(2 * 1 / 12)
+    unknown = AgreementPair(
+        "t2", "a", "b", values | {"annotation_hierarchical_f1": None}, counts
+    )
+    summary = agreement_summary([pair, unknown])
+    assert summary["pooled"]["annotation_hierarchical_f1"] is None
+    # The macro mean averages the pairs that have the value.
+    assert summary["macro_mean"]["annotation_hierarchical_f1"] == 0.0

@@ -4267,6 +4267,8 @@ export interface components {
             annotation_strict_f1: number | null;
             /** Annotation Tolerant F1 */
             annotation_tolerant_f1: number | null;
+            /** Annotation Hierarchical F1 */
+            annotation_hierarchical_f1: number | null;
             /** Mention Strict F1 */
             mention_strict_f1: number | null;
             /** Mention Tolerant F1 */
@@ -4289,6 +4291,8 @@ export interface components {
             annotation_strict_f1: number | null;
             /** Annotation Tolerant F1 */
             annotation_tolerant_f1: number | null;
+            /** Annotation Hierarchical F1 */
+            annotation_hierarchical_f1: number | null;
             /** Mention Strict F1 */
             mention_strict_f1: number | null;
             /** Mention Tolerant F1 */
@@ -4333,6 +4337,8 @@ export interface components {
             modifiers_agreeing: number;
             /** Related Term Conflicts */
             related_term_conflicts: number;
+            /** Hierarchy Credited */
+            hierarchy_credited: number;
             /** Texts */
             texts: number;
             /** Pairs */
@@ -8764,6 +8770,8 @@ export interface components {
             annotation_strict_f1: number | null;
             /** Annotation Tolerant F1 */
             annotation_tolerant_f1: number | null;
+            /** Annotation Hierarchical F1 */
+            annotation_hierarchical_f1: number | null;
             /** Mention Strict F1 */
             mention_strict_f1: number | null;
             /** Mention Tolerant F1 */
@@ -8808,6 +8816,8 @@ export interface components {
             modifiers_agreeing: number;
             /** Related Term Conflicts */
             related_term_conflicts: number;
+            /** Hierarchy Credited */
+            hierarchy_credited: number;
             /** Case Id */
             case_id: string;
             /** Language */

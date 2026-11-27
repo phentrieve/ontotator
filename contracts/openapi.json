@@ -13164,6 +13164,17 @@
             ],
             "title": "Annotation Tolerant F1"
           },
+          "annotation_hierarchical_f1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Hierarchical F1"
+          },
           "mention_strict_f1": {
             "anyOf": [
               {
@@ -13221,6 +13232,7 @@
         "required": [
           "annotation_strict_f1",
           "annotation_tolerant_f1",
+          "annotation_hierarchical_f1",
           "mention_strict_f1",
           "mention_tolerant_f1",
           "term_f1",
@@ -13254,6 +13266,17 @@
               }
             ],
             "title": "Annotation Tolerant F1"
+          },
+          "annotation_hierarchical_f1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Hierarchical F1"
           },
           "mention_strict_f1": {
             "anyOf": [
@@ -13371,6 +13394,10 @@
             "type": "integer",
             "title": "Related Term Conflicts"
           },
+          "hierarchy_credited": {
+            "type": "integer",
+            "title": "Hierarchy Credited"
+          },
           "texts": {
             "type": "integer",
             "title": "Texts"
@@ -13384,6 +13411,7 @@
         "required": [
           "annotation_strict_f1",
           "annotation_tolerant_f1",
+          "annotation_hierarchical_f1",
           "mention_strict_f1",
           "mention_tolerant_f1",
           "term_f1",
@@ -13406,6 +13434,7 @@
           "modifiers_compared",
           "modifiers_agreeing",
           "related_term_conflicts",
+          "hierarchy_credited",
           "texts",
           "pairs"
         ],
@@ -25737,6 +25766,17 @@
             ],
             "title": "Annotation Tolerant F1"
           },
+          "annotation_hierarchical_f1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Hierarchical F1"
+          },
           "mention_strict_f1": {
             "anyOf": [
               {
@@ -25853,6 +25893,10 @@
             "type": "integer",
             "title": "Related Term Conflicts"
           },
+          "hierarchy_credited": {
+            "type": "integer",
+            "title": "Hierarchy Credited"
+          },
           "case_id": {
             "type": "string",
             "title": "Case Id"
@@ -25890,6 +25934,7 @@
         "required": [
           "annotation_strict_f1",
           "annotation_tolerant_f1",
+          "annotation_hierarchical_f1",
           "mention_strict_f1",
           "mention_tolerant_f1",
           "term_f1",
@@ -25912,6 +25957,7 @@
           "modifiers_compared",
           "modifiers_agreeing",
           "related_term_conflicts",
+          "hierarchy_credited",
           "case_id",
           "language",
           "document_id",

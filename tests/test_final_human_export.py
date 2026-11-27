@@ -256,9 +256,10 @@ _VOLATILE = [
 # line to README.txt. #338 added the (here empty) "planned_out" record to
 # receipt.json and the "Taken out of the work plan" count and section to
 # README.txt. #417 said that copied proposals count for the original tool;
-# #389 explained mode_a, mode_b and the mode rows of agreement-summary.csv.
+# #389 explained mode_a, mode_b and the mode rows of agreement-summary.csv;
+# #600 explained annotation_hierarchical_f1 and hierarchy_credited.
 CARRY_FORWARD_DIGEST = (
-    "82e33e503421feacca892abce1dd9687c984f1b0e078d618715ff42de3800394"
+    "ab363d62ef4641d12434e5824ce626af89f3cea9e88e2b3c16db98fe0540ab86"
 )
 
 

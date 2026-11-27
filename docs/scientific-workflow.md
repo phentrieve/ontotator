@@ -263,6 +263,10 @@ an optimal assignment:
 - `annotation_strict_f1`: same term, values and passages;
 - `annotation_tolerant_f1`: same term and values, overlapping passages (a
   finding of the whole text and one with a passage also match);
+- `annotation_hierarchical_f1`: the tolerant value in which a pair of an
+  ancestor and a descendant term (at any distance, `is_a` in the pinned
+  release) with the same values on overlapping text counts half a match;
+  siblings ("Focal seizure" and "Generalized seizure") count nothing;
 - `mention_strict_f1`, `mention_tolerant_f1`: the same per passage;
 - `term_f1`: the sets of terms with their values, regardless of passages;
 - `modifier_agreement`: the share of matched findings with the same
@@ -273,9 +277,19 @@ The counts behind them follow: `findings_a`, `findings_b`, `equal`,
 (other term on overlapping text), `a_only`, `b_only`, the mention and term
 counts, `modifiers_compared`, `modifiers_agreeing` and
 `related_term_conflicts`: those `term_conflicts` whose terms are ancestor
-and descendant in the layer's ontology ("Seizure" and "Focal seizure"). It
-only flags the smaller disagreement; every F1 value counts such a pair as a
-term conflict, as before. Two submissions without findings agree (F1 1).
+and descendant in the layer's ontology ("Seizure" and "Focal seizure"),
+whatever their values, and `hierarchy_credited`: those of them with the same
+values. Only `annotation_hierarchical_f1` uses the hierarchy:
+
+    annotation_hierarchical_f1 = 2 × (equal + compatible + 0.5 × hierarchy_credited)
+                                 / (findings_a + findings_b)
+
+Every other F1 value counts such a pair as a term conflict, as before. The
+weight 0.5 is a fixed, pragmatic choice (#636), not the set-based
+hierarchical F-measure of Kiritchenko et al. (2006), which weighs by the
+shared ancestors and gives siblings credit too; full credit (weight 1) or
+none (0, the tolerant value) follow from the same counts. Two submissions
+without findings agree (F1 1).
 
 `agreement-summary.csv` has two rows per group of pairs. `macro_mean`
 averages each value over the pairs of a text, then over the texts. `pooled`
@@ -304,9 +318,9 @@ tool `agreement_summary` reads it.
 Only F1 values are given. Span annotation has no countable negatives (every
 place in a text where nobody marked anything would be one), so chance-corrected
 coefficients such as Cohen's kappa are not defined for it. Define in the study
-protocol which value is the primary measure; ontology-aware matching (an
-ancestor term as a partial match) is not part of these values;
-`related_term_conflicts` counts such pairs without changing them.
+protocol which value is the primary measure; the hierarchy enters only
+`annotation_hierarchical_f1` (an ancestor term with the same values as half a
+match), never the pairing or the other values.
 
 ### proposals.csv
 

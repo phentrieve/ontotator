@@ -30,7 +30,11 @@ from ontotator.domain.workspace import Submission
 from ontotator.exchange.final_content import freeze_content
 from ontotator.exchange.final_export import agreement_units
 from ontotator.exchange.final_export_guide import submission_kind
-from ontotator.exchange.final_tables import ANNOTATION_KINDS, agreement_report
+from ontotator.exchange.final_tables import (
+    ANNOTATION_KINDS,
+    agreement_report,
+    ontology_loader,
+)
 from ontotator.exchange.human_inputs import human_input_closure
 from ontotator.jobs.queue import check_queue_room
 from ontotator.storage import work_plan_store
@@ -1044,7 +1048,8 @@ class FinalResultService:
 
         Leads only, like the final export: the answer names the annotators'
         pseudonyms, which a consolidator of a project with
-        ``blind_consolidation`` must not learn.
+        ``blind_consolidation`` must not learn. The pinned ontology releases
+        are loaded for the hierarchy (#303, #600), as the export does.
         """
         with self.db.transaction() as conn:
             pid = self._authorize(conn, key, exclusive=False)
@@ -1059,7 +1064,9 @@ class FinalResultService:
             "project": key,
             "state_digest": state["state_digest"],
             "selected_texts": len(state["selections"]),
-            **agreement_report(inputs or {}, units),
+            **agreement_report(
+                inputs or {}, units, ontology_loader(self.db.blobs.path)
+            ),
         }
 
     def freeze(self, key: str, request: dict[str, Any]) -> dict[str, int]:
