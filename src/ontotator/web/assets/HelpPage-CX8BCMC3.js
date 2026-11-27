@@ -1,4 +1,4 @@
-import{i as e,n as t,r as n,s as r,t as i}from"./index-C97Kelgt.js";import{n as a,t as o}from"./lib-D-hQQRpY.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
+import{i as e,n as t,r as n,s as r,t as i}from"./index-3u-8T1QT.js";import{n as a,t as o}from"./lib-C7OqRseq.js";var s=r(e(),1),c=t();function l(){let[e,t]=(0,s.useState)(null);return(0,s.useEffect)(()=>{let e=!0;return n.getAbout().then(n=>{e&&t(n)},()=>void 0),()=>{e=!1}},[]),e?(0,c.jsxs)(`p`,{className:`help-version`,title:e.revision??void 0,children:[`Ontotator `,e.version,e.revision&&(0,c.jsxs)(c.Fragment,{children:[` · commit `,e.revision.slice(0,7)]})]}):null}var u=`# Ontotator user handbook
 
 This handbook explains how to work with Ontotator in the browser. It is for everyone who uses the app: annotators, translation reviewers, consolidators, leads and system administrators. It describes the version of Ontotator that you open it from. If you run the server, read the [server operations guide (for server operators)](../operations.md) instead.
 
@@ -435,7 +435,7 @@ To make the findings list wider or narrower, drag the divider between the findin
 
 The right column works the same way on a wide screen (three columns): drag its left edge (**Resize details panel**), or focus it and press \`←\` or \`→\`; \`Home\` and \`End\` go to the least and the most, a double click or \`Enter\` restores the usual width. The round button on that edge, **Collapse details panel**, folds the column, with the ontology tree, to a narrow strip, so the text gets the room. Click the strip (**Expand details panel**) to bring it back. While the column is folded, the strip names the selected finding or proposal under *Details*. When you mark text, the column opens again by itself, for the term search. Width and folding are kept in this browser, for you.
 
-The small actions of a finding sit next to it as icons: **Show in tree** next to the term's name, **Copy text**, **Add segment** and **Move to a new finding** at each mention. Point at an icon to see its name.
+The small actions of a finding sit next to it as icons: **Show in tree** next to the term's name, **Copy text**, **Add segment** and **Move to a new finding** (a small card that leaves a larger one) at each mention. Point at an icon to see its name.
 
 Some hints have a small close icon (**Hide this hint**). A hidden hint stays hidden in this browser; **More** › **Show hints again** brings all of them back.
 
