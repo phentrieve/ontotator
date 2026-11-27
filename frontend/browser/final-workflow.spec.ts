@@ -337,4 +337,13 @@ test('a lead without the Consolidator role consolidates as You, and full agreeme
   const submissions = s.submissions as { match: string[] };
   expect((selected.request().postDataJSON() as { submission_id: string }).submission_id).toBe(submissions.match[0]);
   await expect(match.locator('.final-panel-success')).toContainText(new RegExp(`Final result saved for ${matchCase}\\W+en\\.`));
+
+  // Progress › Agreement (#600, #636): the two empty submissions behind that result agree.
+  await page.goto(`/#/projects/${encodeURIComponent(s.project)}/progress`);
+  const agreement = page.getByRole('region', { name: 'Agreement', exact: true });
+  await expect(agreement.getByText('Between annotators on the 1 text with a final result, 1 pair of submissions, pooled.', { exact: true })).toBeVisible();
+  const figures = agreement.getByRole('list', { name: 'Pooled agreement', exact: true });
+  await expect(figures.getByRole('listitem').first()).toContainText('Strict F1');
+  await expect(figures.getByRole('listitem').first()).toContainText('1.00');
+  await expect(figures.getByRole('listitem').nth(2)).toContainText('Hierarchical F1');
 });
