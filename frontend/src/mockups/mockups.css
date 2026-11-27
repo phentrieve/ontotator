@@ -1,0 +1,31 @@
+/* Mockups for the owner's sign-off (dev builds only, src/mockups/MockupRoot.tsx). */
+.mockup-banner { margin: 0 0 var(--space-4); padding: var(--space-2) var(--space-3); border: 1px dashed var(--warning); border-radius: var(--radius-sm); background: var(--warning-light); color: var(--text); font-size: var(--size-sm); }
+.mockup-heading-row { display: flex; align-items: center; gap: var(--space-2); }
+.mockup-heading-row h2 { margin: 0; }
+.mockup-agreement { margin-bottom: var(--space-6); }
+.mockup-agreement h3 { margin: var(--space-5) 0 var(--space-2); font-size: var(--size-base); }
+.mockup-figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.mockup-figures li { display: grid; gap: var(--space-1); padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-raised); }
+.mockup-figure-label { font-size: var(--size-sm); color: var(--text-muted); }
+.mockup-figure-n { font-size: var(--size-2xl); line-height: var(--leading-2xl); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
+.mockup-figure-sub { font-size: var(--size-sm); color: var(--text-muted); }
+.mockup-figures .mockup-figure--new { border-color: var(--accent); box-shadow: inset 3px 0 var(--accent); }
+.mockup-new { margin-left: var(--space-1); padding: 0 var(--space-1); border-radius: var(--radius-sm); background: var(--accent-light); color: var(--accent); font-size: var(--size-xs); font-weight: var(--weight-strong); }
+.mockup-breakdown { max-width: 52rem; }
+.mockup-breakdown .num, .mockup-pairs .num { text-align: right; }
+.mockup-bar-col { width: 34%; }
+.mockup-bar { display: block; height: 10px; margin-top: 6px; border-radius: 3px; background: var(--surface-sunken); overflow: hidden; }
+.mockup-bar span { display: block; height: 100%; background: var(--border-strong); }
+.mockup-row--same .mockup-bar span { background: var(--success); }
+.mockup-row--related .mockup-bar span { background: repeating-linear-gradient(135deg, var(--accent) 0 4px, var(--accent-light) 4px 7px); }
+.mockup-row--related th { font-weight: var(--weight-strong); }
+.mockup-glyph { display: inline-block; width: 1.25em; color: var(--accent); }
+@media (max-width: 700px) {
+  .mockup-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mockup-bar-col { display: none; }
+}
+@media (forced-colors: active) {
+  .mockup-bar span { forced-color-adjust: none; background: Highlight; }
+}
+.mockup-breakdown tbody th { font-weight: var(--weight-regular); }
+.mockup-breakdown tbody .mockup-row--related th { font-weight: var(--weight-strong); }
